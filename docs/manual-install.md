@@ -79,7 +79,7 @@ npm ci
 
 ## 이전 이름의 스킬을 사용하고 있다면
 
-새 배포 이름과 호출명은 **`realtor-naver-blog` / `$realtor-naver-blog`**입니다. 이전 이름은 `naver-realtor-blog-pro`입니다.
+새 배포 이름은 `realtor-naver-blog`, 호출명은 `$realtor-naver-blog`입니다. 이전 이름은 `naver-realtor-blog-pro`입니다.
 
 사무소 프로필과 저장 문체의 기본 경로는 호환성을 위해 `~/.codex/naver-realtor-blog/`를 유지합니다. 스킬 이름을 바꾸려고 프로필 폴더를 지우거나 새로 만들 필요가 없습니다.
 
