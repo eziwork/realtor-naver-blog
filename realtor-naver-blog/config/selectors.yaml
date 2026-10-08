@@ -1,0 +1,4 @@
+# 네이버 에디터 셀렉터 오버라이드.
+# 기본값은 post-draft.mjs 안에 있고, 네이버 UI가 바뀌면 이 파일만 고친다.
+# 형식: key: "css selector"
+# title_para: ".se-title-text .se-text-paragraph"
