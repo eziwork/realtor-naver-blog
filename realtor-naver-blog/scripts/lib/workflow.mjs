@@ -1,11 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import {readJSON, writeJSON, hash, nonempty, requireThat, validateListing, validateStrategy, validateStyle, blogKey} from './contracts.mjs';
 import {renderPost, officeFingerprint} from './content.mjs';
+import {saveContext, listKnowledge, validateAdviceRefs} from './broker-knowledge.mjs';
 
 export class Workflow {
-  constructor(runDir) { this.dir = path.resolve(runDir); this.file = path.join(this.dir, 'run-state.json'); }
+  constructor(runDir, {profileDir = path.join(os.homedir(), '.codex/naver-realtor-blog')} = {}) {
+    this.dir = path.resolve(runDir); this.file = path.join(this.dir, 'run-state.json'); this.profileDir = path.resolve(profileDir);
+  }
   read(name) { return readJSON(path.join(this.dir, name)); }
   put(name, data) { writeJSON(path.join(this.dir, name), data); }
   state() { return fs.existsSync(this.file) ? readJSON(this.file) : {schema_version: '1.0', phase: 'input', approval: null, attempts: []}; }
@@ -22,12 +26,23 @@ export class Workflow {
   propose(data) {
     const listing = this.read('facts.json');
     validateStrategy(data, listing);
+    const context = fs.existsSync(path.join(this.dir,'broker-context.json')) ? this.read('broker-context.json') : null;
+    requireThat(context?.listing_hash !== hash(listing) || context.status !== 'asked', 'record answered, skipped or unanswered before proposing');
+    const knowledge = data.knowledge_refs?.length ? listKnowledge(this.profileDir, listing).items : [];
+    validateAdviceRefs(data,listing,context,knowledge);
     const state = this.state();
     requireThat(state.listing_hash === hash(listing), 'facts changed outside workflow: stage facts again');
     this.put('strategy.json', data);
     state.strategy_hash = hash(data); state.approval = null; state.prepared = null; state.result = null;
     state.phase = 'awaiting_strategy_confirmation';
     return this.save(state);
+  }
+  context(data) {
+    const context=saveContext(this.dir,data,this.read('facts.json'));
+    const state=this.state();
+    // Advice updates do not alter a confirmed strategy. Only re-propose/fact edits do.
+    state.broker_context={path:'broker-context.json',status:context.status,listing_hash:context.listing_hash};
+    this.save(state); return context;
   }
   approve({strategy_hash, listing_hash, user_quote}) {
     const state = this.state();

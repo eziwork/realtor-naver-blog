@@ -31,9 +31,11 @@ export function validateListing(listing) {
   const sourceIDs = uniqueIDs(listing.sources, 'sources');
   for (const source of listing.sources) {
     requireThat(['user', 'listing', 'photo', 'document'].includes(source.kind) && nonempty(source.locator) && nonempty(source.excerpt), 'source needs kind, locator, and original excerpt');
+    requireThat(!source.id.startsWith('know-') && !source.knowledge_id && !source.knowledge_refs && source.scope !== 'office_pattern' && !['office_pattern','evaluation','customer_reaction'].includes(source.context_kind), 'advice and reactions cannot be listing fact sources');
   }
   const factIDs = uniqueIDs(listing.facts, 'facts');
   for (const fact of listing.facts) {
+    requireThat(!fact.id?.startsWith('know-') && !fact.knowledge_id && !fact.knowledge_refs && !fact.context_refs, 'advice IDs cannot be promoted to fact IDs');
     requireThat(nonempty(fact.label) && ['confirmed', 'unknown', 'conflict'].includes(fact.status), 'fact label/status required');
     requireThat(Array.isArray(fact.source_ids) && fact.source_ids.every(id => sourceIDs.has(id)), `invalid sources: ${fact.id}`);
     if (fact.status === 'confirmed') requireThat(nonempty(fact.value) && fact.source_ids.length, `confirmed fact lacks evidence: ${fact.id}`);

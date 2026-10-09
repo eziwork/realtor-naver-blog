@@ -1,4 +1,4 @@
-# 파일 계약과 CLI (v0.2)
+# 파일 계약과 CLI (v0.3)
 
 모든 명령은 스킬 폴더 기준 `node scripts/workflow.mjs <명령>`이다. --file에는 UTF-8 JSON 파일, --run에는 init-run이 반환한 폴더를 전달한다. 출력은 JSON이며 실패 시 exit 1. Codex가 데이터와 관측 근거를 작성하고 코드는 스키마·참조·해시·상태 전이를 검사한다. 사용자 응답과 브라우저 관측을 암호학적으로 인증하는 도구는 아니다. 실제 응답/관측을 정확히 기록해야 한다.
 
@@ -32,6 +32,17 @@ source.kind: user / listing / photo / document. locator는 사용자 메시지 �
 
 `facts --run <run> --file <facts.json>`은 변경 시 확정/준비 상태를 해제한다. provenance 포함 입력이 바뀌면 보수적으로 재확인한다.
 
+현장 기록의 명시적으로 확인된 사실만 user 출처로 연결한다. 중개사의 평가·고객 반응·사무소 상담 노하우를 facts로 전용하지 않는다.
+
+### 현장 기록·상담 노하우
+
+- `context-save --run <run> --file <context-input.json>`: 작업별 broker-context.json 저장. 질문 판단·최대 2개 질문·응답 상태·분류된 사용자 근거를 기록한다.
+- `knowledge-list [--run <run>] [--profile <profile.yaml>]`: run을 주면 일치하는 활성 항목과 보류 중인 충돌을 조회한다. 생략하면 관리용 전체 목록.
+- `knowledge-save --file <knowledge-input.json> [--profile <profile.yaml>]`: 명확한 반복 상담 경험 저장, 중복 방지, 명시적 수정 또는 충돌 보류.
+- `knowledge-retire --file <retire.json> [--profile <profile.yaml>]`: 실제 잊기 요청으로 비활성화.
+
+계약과 예시는 [broker-knowledge.md](broker-knowledge.md)를 따른다. office-knowledge.json은 profile.yaml과 같은 폴더에 저장하며 YAML·문체를 수정하지 않는다. 다른 프로필을 사용하는 작업은 propose에도 같은 --profile을 전달한다.
+
 ## 2. 전략 strategy.json
 
 ```json
@@ -57,6 +68,8 @@ source.kind: user / listing / photo / document. locator는 사용자 메시지 �
 `check-approved --run <run>` 실패 시 원고 작성/브라우저 입력을 하지 않는다.
 
 cta.channel은 phone 기본, 사용자가 등록된 다른 채널을 선택하면 registered. 후자는 office.public_contact_url(HTTPS), office.public_contact_label을 사용한다. 현재 프로필 값 외 연락처를 만들어 넣지 않는다.
+
+선택 필드 context_refs / knowledge_refs는 `[{id,snapshot,usage,reason}]`이다. 현재 현장 기록과 활성·범위 일치 노하우만 참조하며 내용 스냅샷을 검증한다. 기존 작업에는 없어도 된다. 질문 상태 asked는 answered/skipped/unanswered로 처리한 뒤 제안한다. 기억 저장 자체는 승인 상태를 바꾸지 않으며 전략의 주요 내용을 바꿀 때만 재제안·재확정한다.
 
 ## 3. 문체 blog-styles.json
 
