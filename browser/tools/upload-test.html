@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><title>업로드 테스트</title>
+<body style="font-family:sans-serif;text-align:center;padding:40px">
+<h1>내장 브라우저 사진 업로드 테스트</h1>
+<input id="f" type="file" accept="image/*" multiple>
+<p id="result">아직 선택된 파일 없음</p>
+<div id="preview"></div>
+<script>
+document.getElementById('f').addEventListener('change', e => {
+  const files = [...e.target.files];
+  document.getElementById('result').textContent =
+    'UPLOAD_OK ' + files.length + '장: ' + files.map(f => f.name + ' (' + f.size + ' bytes)').join(', ');
+  const p = document.getElementById('preview'); p.innerHTML = '';
+  files.forEach(f => { const img = document.createElement('img'); img.src = URL.createObjectURL(f); img.style.maxWidth = '200px'; img.style.margin = '6px'; p.appendChild(img); });
+});
+</script>
+</body></html>
