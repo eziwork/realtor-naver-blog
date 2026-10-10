@@ -58,9 +58,18 @@ source.kind: user / listing / photo / document. locator는 사용자 메시지 �
   "intro_direction":"공간을 비교하는 독자의 질문부터",
   "sections":[{"id":"space","question":"공간 구성이 생활에 맞는가?","direction":"확인된 면적과 사진으로 설명","fact_ids":["area"],"photo_ids":[]}],
   "cta":{"channel":"phone","benefit":"희망 가구 배치와 매매가 확인"},
-  "checks":["매매가 확인 필요"]
+  "checks":["매매가 확인 필요"],
+  "fact_coverage":[
+    {"fact_id":"type","decision":"use","reason":"제목·표"},
+    {"fact_id":"trade","decision":"use","reason":"제목·표"},
+    {"fact_id":"region","decision":"use","reason":"제목·검색어"},
+    {"fact_id":"area","decision":"use","reason":"후킹·표"}
+  ]
 }
 ```
+
+`fact_coverage`: confirmed 사실 전부를 `use`/`exclude`로 분류하고 각각 `reason`을 적는다. 하나라도 빠지거나 이유가 비면 `propose`가 실패한다. 판단(무엇을 쓸지)은 Codex가 하고 코드는 빠짐없음만 검사한다.
+
 
 `propose --run <run> --file <strategy.json>` 후 여덟 항목을 사용자에게 제시한다. 반환된 listing_hash와 strategy_hash를 기록해 둔다. 확정 응답 후만 approval.json 생성:
 `{"listing_hash":"반환 해시","strategy_hash":"반환 해시","user_quote":"사용자의 실제 확정 응답"}`.

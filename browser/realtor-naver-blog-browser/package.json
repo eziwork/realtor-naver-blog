@@ -1,9 +1,0 @@
-{
-  "name": "realtor-naver-blog-browser-skill",
-  "private": true,
-  "type": "module",
-  "description": "Built-in browser only: no Playwright, no Chromium download. Scripts use Node built-in modules.",
-  "engines": {
-    "node": ">=20"
-  }
-}

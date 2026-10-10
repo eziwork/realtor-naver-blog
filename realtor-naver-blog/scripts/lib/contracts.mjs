@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const TYPES = ['아파트', '빌라', '오피스텔', '주택', '상가', '사무실', '창고', '공장', '토지'];
+export const TYPES = ['아파트', '빌라', '오피스텔', '주택', '상가', '사무실', '창고', '공장', '공장·창고', '토지'];
 export const STYLE_FIELDS = ['honorifics', 'sentence_length', 'paragraph_rhythm', 'opening', 'headings', 'terminology', 'emphasis', 'emoji', 'consultation'];
 export function requireThat(value, message) { if (!value) throw new Error(message); }
 export function nonempty(value) { return typeof value === 'string' && value.trim().length > 0; }
@@ -81,7 +81,26 @@ export function validateStrategy(strategy, listing) {
   // Unknowns must remain visible in the strategy instead of silently disappearing.
   for (const unknown of listing.unknowns) requireThat(strategy.checks.includes(unknown), `missing check: ${unknown}`);
   for (const fact of listing.facts.filter(f => f.status !== 'confirmed')) requireThat(strategy.checks.some(x => x.includes(fact.label)), `missing check for ${fact.label}`);
+  validateFactCoverage(strategy, listing);
   return strategy;
+}
+// 확인된 사실이 이유 없이 사라지지 않게, 전략에서 사실마다 사용/제외와 이유를 밝힌다.
+// 판단은 Codex가 하고, 코드는 빠짐없이 분류됐는지와 제외 이유가 있는지만 검사한다.
+export function validateFactCoverage(strategy, listing) {
+  const coverage = strategy.fact_coverage;
+  requireThat(Array.isArray(coverage), 'fact_coverage required: classify every confirmed fact as use or exclude');
+  const confirmed = listing.facts.filter(f => f.status === 'confirmed').map(f => f.id);
+  const seen = new Set();
+  for (const row of coverage) {
+    requireThat(confirmed.includes(row.fact_id), `fact_coverage has unknown or unconfirmed fact: ${row.fact_id}`);
+    requireThat(!seen.has(row.fact_id), `duplicate fact_coverage: ${row.fact_id}`);
+    seen.add(row.fact_id);
+    requireThat(['use', 'exclude'].includes(row.decision), `fact_coverage decision must be use or exclude: ${row.fact_id}`);
+    requireThat(nonempty(row.reason), `fact_coverage needs a reason: ${row.fact_id}`);
+  }
+  const missing = confirmed.filter(id => !seen.has(id));
+  requireThat(missing.length === 0, `fact_coverage missing confirmed facts: ${missing.join(', ')}`);
+  return coverage;
 }
 export function blogKey(value) {
   requireThat(nonempty(value), 'blog ID or URL required');

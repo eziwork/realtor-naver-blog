@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import {fileURLToPath} from "node:url";
 
 function argsOf(argv) {
   const out = {};
@@ -31,7 +33,12 @@ function slugify(value) {
 }
 
 const args = argsOf(process.argv.slice(2));
-const root = path.resolve(args.root || path.join(process.cwd(), "outputs"));
+// 작업 폴더는 스킬 폴더 밖에 둔다. 스킬을 다시 설치·업데이트해도 원고와 진행 기록이 남는다.
+const root = path.resolve(args.root || path.join(os.homedir(), ".codex", "naver-realtor-blog", "runs"));
+const skillDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+if (root === skillDir || root.startsWith(skillDir + path.sep)) {
+  throw new Error("--root must be outside the skill folder; reinstalling the skill would delete the runs: " + root);
+}
 const date = String(args.date || seoulDate());
 const slug = slugify(args.slug);
 

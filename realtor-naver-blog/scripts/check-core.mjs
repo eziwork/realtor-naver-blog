@@ -64,7 +64,9 @@ const CORE = [
       {re: /never ask for an ID|Never request credentials/i, why: "아이디·비밀번호를 묻지 말라는 규칙이 사라졌습니다"},
       {re: /never a tab the user opened|task-owned tab/i, why: "사용자가 열어둔 탭을 건드리지 말라는 규칙이 사라졌습니다"},
       {re: /Never publish/i, why: "발행 금지 규칙이 사라졌습니다"},
-      {re: /저장 버튼만 사용/, why: "임시저장만 누른다는 규칙이 사라졌습니다"}
+      {re: /저장 버튼만 사용/, why: "임시저장만 누른다는 규칙이 사라졌습니다"},
+      {re: /어떤 '삭제' 버튼도 누르지 않는다/, why: "삭제 버튼 금지 규칙(전체 삭제 실사고)이 사라졌습니다"},
+      {re: /확인창은 취소만/, why: "확인창 자동 수락 금지 규칙이 사라졌습니다"}
     ],
     forbid: [
       {re: /public_publish\s*:\s*true/i, why: "공개 발행을 참으로 설정하는 문구가 있습니다"},
@@ -94,7 +96,7 @@ const CORE = [
     need: [
       {re: /확정 응답을 받기 전에는 최종 원고 작성/, why: "전략 확정 절차가 없습니다"},
       {re: /check-approved/, why: "확정 상태 검증 명령이 없습니다"},
-      {re: /내장 브라우저/, why: "기본 브라우저 전송 방식이 없습니다"},
+      {re: /내장 브라우저 하나만 쓴다/, why: "내장 브라우저 전용 규칙이 사라졌습니다"},
       {re: /재열람/, why: "저장본 재열람 검수가 없습니다"}
     ],
     forbid: []
@@ -129,7 +131,7 @@ function violates(rule, line) {
   return false;
 }
 
-const results = CORE.map((core) => {
+let results = CORE.map((core) => {
   const problems = [];
   for (const rule of core.need) {
     if (!rule.re.test(all)) problems.push(rule.why);
@@ -140,12 +142,24 @@ const results = CORE.map((core) => {
   return {id: core.id, label: core.label, ok: problems.length === 0, problems};
 });
 
-// SKILL.md가 부르는 스크립트가 실제로 있는지도 확인합니다.
+// SKILL.md와 references가 부르는 스크립트가 실제로 있는지도 확인합니다.
 const missingScripts = [];
-for (const match of skill.matchAll(/scripts\/([\w.-]+\.mjs)/g)) {
+for (const match of all.matchAll(/scripts\/([\w.-]+\.mjs)/g)) {
   const file = path.join(skillDir, "scripts", match[1]);
   if (!fs.existsSync(file) && !missingScripts.includes(match[1])) missingScripts.push(match[1]);
 }
+
+// 내장 브라우저 전용: 스킬 폴더에 Playwright 의존성이 다시 들어오면 실패로 봅니다.
+const pkgFile = path.join(skillDir, "package.json");
+const pkg = fs.existsSync(pkgFile) ? JSON.parse(fs.readFileSync(pkgFile, "utf8")) : {};
+const pkgText = JSON.stringify({dependencies: pkg.dependencies, devDependencies: pkg.devDependencies, scripts: pkg.scripts});
+const browserOnly = {
+  id: "7-내장브라우저전용",
+  label: "Playwright·Chromium 없이 내장 브라우저만 쓴다",
+  ok: !/playwright/i.test(pkgText),
+  problems: /playwright/i.test(pkgText) ? ["스킬 package.json에 playwright 의존성이 있습니다"] : []
+};
+results.push(browserOnly);
 
 const ok = results.every((item) => item.ok) && missingScripts.length === 0;
 

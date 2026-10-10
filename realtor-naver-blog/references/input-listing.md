@@ -6,20 +6,20 @@
 - 중개사는 자기 매물의 번호를 **상세 페이지 '기본 정보' 표 하단**에서
   확인한다 (입주가능일 다음 줄, `매물번호` 라벨). 이 번호 = 상세 URL
   `fin.land.naver.com/articles/{번호}` 의 숫자 = API의 articleNumber.
-- `fetch-listing.mjs`는 이 번호로 front-api 3종(key → basicInfo →
-  **galleryImages**)을 읽어 매물 사실과 **갤러리 사진 전체의 원본 URL**을
-  가져온다. 화면에 보이는 대표 사진 1장이 아니라 등록된 사진 전부다.
+- 수집은 **Codex 내장 브라우저만** 사용한다. 절차는 [browser-collect.md](browser-collect.md):
+  front-api 3종(key → basicInfo → **galleryImages**)으로 매물 사실과 **갤러리 사진
+  전체**를 가져온다. 화면에 보이는 대표 사진 1장이 아니라 등록된 사진 전부다.
+  셸에서 브라우저를 띄우는 수집기(fetch-listing.mjs)는 이 스킬에 없다.
 
 ## Rules
 
-- Digits-only input (6+ digits) → articleNo로 취급하고
-  `node scripts/fetch-listing.mjs --article <no> --out <run-dir> --photos` 실행.
-- **URL 입력 분기**:
-  - `fin.land.naver.com/articles/{번호}` 형태 → 번호를 추출해 `--article`로 전달한다. 저장소 수집기는 `--url`도 지원하지만 이전 로컬 수집기와의 호환을 위해 번호 경로를 우선한다.
-  - `fin.land.naver.com/map?...` 지도 공유 URL → **번호가 들어있지 않다(실측)**.
-    스크립트가 `map_url_has_no_article_number`로 거절하니, 사용자에게 매물
-    상세 페이지 URL 또는 '기본 정보' 표 하단의 매물번호를 한 번 요청한다.
-  - 네이버가 아닌 매물 사이트 URL → 자연어 경로 (SKILL.md Stage 0).
+- 사용자 입력은 먼저 `node scripts/import-listing.mjs resolve --input "<입력>"`으로 해석한다.
+  - 숫자 6자리 이상 또는 `fin.land.naver.com/articles/{번호}` 링크 → 번호를 얻어 내장 브라우저 수집으로 간다.
+  - `fin.land.naver.com/map?...` 지도 공유 링크 → **번호가 들어있지 않다(실측)**.
+    `map_url_has_no_article_number`가 나오면 사용자에게 매물 상세 링크 또는
+    '기본 정보' 표 하단의 매물번호를 한 번 요청한다.
+  - 네이버가 아닌 매물 사이트 링크 → 자연어 경로.
+- 수집 후 `node scripts/import-listing.mjs import --run <run-dir> --capture <capture.json>`으로 listing.json을 만든다.
 - **결과 해석 — 카운트를 그대로 보고한다**: 출력 JSON의
   `photos: {expected, downloaded, failed[]}` 를 읽고, `expected ≠ downloaded`
   이면 실패 목록(사유 포함)을 요약 보고에 그대로 옮긴다. "사진 몇 장은

@@ -8,7 +8,7 @@ const centerStyle = 'text-align: center';
 const blankLine = `<p style="${centerStyle}"><br></p>`;
 const centered = (content, tag = 'p') => `<${tag} style="${centerStyle}">${content}</${tag}>\n${blankLine}`;
 const numbers = text => String(text).normalize('NFKC').replace(/(?<=\d),(?=\d)/g, '').match(/\d+(?:\.\d+)?/g) || [];
-const measurements = text => (String(text).normalize('NFKC').replace(/(?<=\d),(?=\d)/g, '').match(/\d+(?:\.\d+)?\s*(?:만\s*원|억\s*원|천\s*원|억|만원|원|m2|평|층|분|시간|km|m|룸|개|톤|%)/g) || []).map(x=>x.replace(/\s/g,''));
+const measurements = text => (String(text).normalize('NFKC').replace(/(?<=\d),(?=\d)/g, '').match(/\d+(?:\.\d+)?\s*(?:만\s*원|억\s*원|천\s*원|억|만원|원|m2|평|층|분|시간|km|m|룸|개|톤|%)/g) || []).map(x=>x.replace(/\s/g,'').replace(/(억|만|천)원$/,'$1'));
 export const officeFingerprint = office => hash(office);
 export function telephone(value) {
   const number = String(value ?? '').replace(/[\s()-]/g, '');

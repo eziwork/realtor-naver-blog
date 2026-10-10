@@ -16,6 +16,13 @@ export class Workflow {
   save(state) { state.updated_at = new Date().toISOString(); writeJSON(this.file, state); return state; }
   listing(data) {
     validateListing(data);
+    // 내장 브라우저 수집 결과가 불완전하면(사진 장수 불일치·썸네일만·API 미시도) 사용자 응답 없이 진행하지 않는다.
+    const collected = path.join(this.dir, 'listing.json');
+    if (fs.existsSync(collected)) {
+      const gallery = JSON.parse(fs.readFileSync(collected, 'utf8')).gallery;
+      requireThat(!gallery || gallery.complete !== false || gallery.accepted_incomplete,
+        'PHOTO_COLLECTION_INCOMPLETE: ' + (gallery?.incomplete_reasons || []).join('; ') + ' — 재수집하거나 사용자 응답을 받아 import --accept-incomplete로 다시 정리하세요');
+    }
     const state = this.state();
     const changed = state.listing_hash !== hash(data);
     this.put('facts.json', data);

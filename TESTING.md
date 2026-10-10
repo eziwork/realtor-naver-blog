@@ -5,10 +5,10 @@
 ## 0. 설치
 
 ```bash
-cp -R realtor-naver-blog-browser ~/.codex/skills/   # 저장소 루트에서
+cp -R realtor-naver-blog ~/.codex/skills/   # 저장소 루트에서
 ```
 
-Codex 앱 재시작 → 새 대화에서 `$realtor-naver-blog-browser`가 보이는지 확인.
+Codex 앱 재시작 → 새 대화에서 `$realtor-naver-blog`가 보이는지 확인.
 
 ## 1. 사진 업로드 기능만 (로그인 불필요, 2분)
 
@@ -26,7 +26,7 @@ file://<저장소 절대경로>/tools/upload-test.html
 ## 2. 매물번호 수집만 (5분) — **사진이 여러 장인 매물로**
 
 ```text
-$realtor-naver-blog-browser
+$realtor-naver-blog
 매물번호 [네이버 매물번호]로 수집 단계까지만 해줘.
 references/browser-collect.md 절차대로 하고, import-listing.mjs import 결과 JSON을 그대로 보여줘.
 전략·원고·네이버 입력은 하지 마.

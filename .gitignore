@@ -11,5 +11,5 @@ blog-styles.json
 *storage-state*.json
 cookies*.json
 browser-profile/
-playwright-profile/
 *.log
+dist/

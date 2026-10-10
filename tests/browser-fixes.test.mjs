@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {Workflow} from '../realtor-naver-blog-browser/scripts/lib/workflow.mjs';
-import {hash} from '../realtor-naver-blog-browser/scripts/lib/contracts.mjs';
+import {Workflow} from '../realtor-naver-blog/scripts/lib/workflow.mjs';
+import {hash} from '../realtor-naver-blog/scripts/lib/contracts.mjs';
 import {fixture, scenarios, office} from './fixtures.mjs';
 
 const factory = scenarios.find(s => s.type === '공장·창고');
@@ -43,8 +43,8 @@ test('a price that is not in the facts is still rejected', t => {
 });
 
 import {pathToFileURL} from 'node:url';
-import {validateStrategy} from '../realtor-naver-blog-browser/scripts/lib/contracts.mjs';
-const importer = () => import(pathToFileURL(path.resolve('realtor-naver-blog-browser/scripts/import-listing.mjs')).href);
+import {validateStrategy} from '../realtor-naver-blog/scripts/lib/contracts.mjs';
+const importer = () => import(pathToFileURL(path.resolve('realtor-naver-blog/scripts/import-listing.mjs')).href);
 
 function thumbCapture(dir, extra = {}) {
   fs.writeFileSync(path.join(dir, 'one.jpg'), 'thumb');

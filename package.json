@@ -1,16 +1,13 @@
 {
   "name": "realtor-naver-blog",
   "private": true,
-  "description": "Listing intent strategy, approval, per-blog voice and verified Naver drafts through the built-in browser.",
+  "description": "Listing strategy, approval, per-blog voice and verified Naver drafts using only the Codex built-in browser.",
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "postinstall": "playwright install chromium"
+    "zip": "rm -rf dist && mkdir -p dist && zip -rq dist/realtor-naver-blog.zip realtor-naver-blog -x '*.DS_Store' && echo dist/realtor-naver-blog.zip"
   },
-  "dependencies": {
-    "playwright": "1.62.1"
-  },
-  "version": "0.3.0",
+  "version": "0.5.0",
   "engines": {
     "node": ">=20"
   }

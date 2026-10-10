@@ -1,15 +1,8 @@
 {
   "name": "realtor-naver-blog-skill",
   "private": true,
-  "description": "Listing intent strategy, approval, per-blog voice and verified Naver drafts through the built-in browser.",
   "type": "module",
-  "scripts": {
-    "postinstall": "playwright install chromium"
-  },
-  "dependencies": {
-    "playwright": "1.62.1"
-  },
-  "version": "0.3.0",
+  "description": "Built-in browser only: no Playwright, no Chromium download. Scripts use Node built-in modules.",
   "engines": {
     "node": ">=20"
   }
