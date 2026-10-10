@@ -1,0 +1,5 @@
+interface:
+  display_name: "네이버 매물블로그 (내장 브라우저)"
+  short_description: "매물의 검색 의도와 문의 전략을 확정하고 블로그 글을 임시저장·검수"
+  brand_color: "#03C75A"
+  default_prompt: "$realtor-naver-blog-browser 이 매물의 타겟과 검색 의도에 맞는 전략 한 안을 추천해줘. 내가 확정하면 내 문체로 작성하고 내장 브라우저에서 임시저장·검수해줘."

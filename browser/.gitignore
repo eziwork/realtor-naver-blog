@@ -1,0 +1,15 @@
+node_modules/
+outputs/
+raw_*.html
+.DS_Store
+work/
+.env
+.env.*
+!.env.example
+profile.yaml
+blog-styles.json
+*storage-state*.json
+cookies*.json
+browser-profile/
+*.log
+dist/
