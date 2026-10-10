@@ -136,6 +136,6 @@ $realtor-naver-blog
 
 ## 검증과 출처
 
-저장소 루트에서 `npm test`(51개)와 `node realtor-naver-blog/scripts/check-core.mjs`로 확인합니다. 내장 브라우저 동작은 코드 테스트로 확인할 수 없어 [TESTING.md](TESTING.md)대로 Codex 앱에서 확인합니다.
+저장소 루트에서 `npm test`(52개)와 `node realtor-naver-blog/scripts/check-core.mjs`로 확인합니다. 내장 브라우저 동작은 코드 테스트로 확인할 수 없어 [TESTING.md](TESTING.md)대로 Codex 앱에서 확인합니다.
 
 [Dr-Min/naver-realtor-blog-pro](https://github.com/Dr-Min/naver-realtor-blog-pro)의 수집·전송 실측 교훈과 Eziwork v0.3의 전략 확정·문체·재열람 흐름을 합쳤습니다. OpenAI나 네이버의 공식 제품은 아닙니다.

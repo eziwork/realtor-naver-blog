@@ -6,6 +6,8 @@ const esc = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&l
 const inline = text => esc(text).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/==([^=]+)==/g, '<mark>$1</mark>');
 const centerStyle = 'text-align: center';
 const blankLine = `<p style="${centerStyle}"><br></p>`;
+const tableStyle = 'border-collapse:collapse;width:100%';
+const cellStyle = `border:1px solid #d9dde2;padding:8px;${centerStyle};`;
 const centered = (content, tag = 'p') => `<${tag} style="${centerStyle}">${content}</${tag}>\n${blankLine}`;
 const numbers = text => String(text).normalize('NFKC').replace(/(?<=\d),(?=\d)/g, '').match(/\d+(?:\.\d+)?/g) || [];
 const measurements = text => (String(text).normalize('NFKC').replace(/(?<=\d),(?=\d)/g, '').match(/\d+(?:\.\d+)?\s*(?:만\s*원|억\s*원|천\s*원|억|만원|원|m2|평|층|분|시간|km|m|룸|개|톤|%)/g) || []).map(x=>x.replace(/\s/g,'').replace(/(억|만|천)원$/,'$1'));
@@ -72,7 +74,10 @@ export function renderPost(post, listing, strategy, office, runDir) {
       });
       tables.push(rows);
       md.push('| 항목 | 내용 |', '|---|---|', ...rows.map(r => `| ${r[0]} | ${r[1]} |`), '');
-      html.push(`<table style="${centerStyle}"><tbody><tr><th style="${centerStyle}">항목</th><th style="${centerStyle}">내용</th></tr>${rows.map(r => `<tr><td style="${centerStyle}">${esc(r[0])}</td><td style="${centerStyle}">${inline(r[1])}</td></tr>`).join('')}</tbody></table>\n${blankLine}`);
+      // Dr-Min cb866fe 실측: 스타일 없는 표는 네이버 편집기에서 테두리 없는 흰 표(50:50)로 바뀐다.
+      // 편집기 변환에서 살아남는 인라인 스타일: 테두리 #d9dde2, 첫 열 배경 #f5f6f8 + 굵게, 28:72 폭, padding 8px.
+      // '항목/내용' 머리 행은 잡음이라 넣지 않는다.
+      html.push(`<table style="${tableStyle}"><colgroup><col style="width:28%"><col style="width:72%"></colgroup><tbody>${rows.map(r => `<tr><td style="${cellStyle}background-color:#f5f6f8;width:28%"><b>${esc(r[0])}</b></td><td style="${cellStyle}width:72%">${inline(r[1])}</td></tr>`).join('')}</tbody></table>\n${blankLine}`);
     } else if (block.type === 'map') {
       checkText({text: block.query, fact_ids: block.fact_ids}, listing, office);
       requireThat(block.fact_ids.length, 'map query needs confirmed location');

@@ -134,3 +134,22 @@ test('post-template pre-fills hashes, every photo, the fact table and the banner
   const md = fs.readFileSync(path.join(dir, 'blog-post.md'), 'utf8');
   assert.ok(md.includes('| conditions | 매매가 23억 원, 연면적 594㎡, 층고 8.5m |'));
 });
+
+test('condition table keeps the measured Naver styling: borders, shaded bold label column, 28:72, no 항목/내용 row', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rnb-table-'));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  fs.writeFileSync(path.join(dir, 'sample.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXgAAAABJRU5ErkJggg==', 'base64'));
+  const flow = new Workflow(dir);
+  const {listing, strategy, post} = fixture(factory);
+  flow.listing(listing); flow.propose(strategy);
+  flow.approve({listing_hash: hash(listing), strategy_hash: hash(strategy), user_quote: '테스트 시뮬레이션: 이 전략으로 진행'});
+  flow.prepare(post, office, 'fixture-blog');
+  const html = fs.readFileSync(path.join(dir, 'transfer.html'), 'utf8');
+  const table = html.match(/<table[\s\S]*?<\/table>/)[0];
+  assert.match(table, /border-collapse:collapse/);
+  assert.match(table, /border:1px solid #d9dde2/);
+  assert.match(table, /background-color:#f5f6f8;width:28%"><b>/);
+  assert.match(table, /width:72%/);
+  assert.doesNotMatch(table, /<th|>항목</);
+  assert.match(table, /text-align: center/);
+});
