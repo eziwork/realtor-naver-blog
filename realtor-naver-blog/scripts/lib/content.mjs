@@ -3,12 +3,18 @@ import path from 'node:path';
 import {hash, requireThat, nonempty, confirmedRefs} from './contracts.mjs';
 
 const esc = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
-const inline = text => esc(text).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/==([^=]+)==/g, '<mark>$1</mark>');
+// 글자 크기 (가독성): 본문 16px, 소제목 24px 굵게, 조건표 15px. 셋 다 네이버 스마트에디터 기본 크기 목록에 있는 값이다.
+// Dr-Min 2026-08-24 실측: 붙여넣기는 span의 font-size(→se-fs19 등)·font-weight·배경색을 살린다.
+// 문단마다 크기를 직접 적지 않으면 변환기가 직전 소제목(크게·굵게) 스타일을 다음 문단까지 이어 붙인다.
+// 강조도 실측으로 살아남은 형태(굵게 = font-weight:700 span, 형광 = 배경색 span)로 넣는다.
+export const FONT = {body: 16, heading: 24, table: 15};
+const inline = text => esc(text).replace(/\*\*([^*]+)\*\*/g, '<span style="font-weight:700;">$1</span>').replace(/==([^=]+)==/g, '<span style="background-color:#fff3b0;">$1</span>');
 const centerStyle = 'text-align: center';
-const blankLine = `<p style="${centerStyle}"><br></p>`;
+const sized = (content, px, bold = false) => `<span style="font-size:${px}px;${bold ? 'font-weight:700;' : ''}">${content}</span>`;
+const blankLine = `<p style="${centerStyle}">${sized('<br>', FONT.body)}</p>`;
 const tableStyle = 'border-collapse:collapse;width:100%';
 const cellStyle = `border:1px solid #d9dde2;padding:8px;${centerStyle};`;
-const centered = (content, tag = 'p') => `<${tag} style="${centerStyle}">${content}</${tag}>\n${blankLine}`;
+const centered = (content, kind = 'body') => `<p style="${centerStyle}">${kind === 'heading' ? sized(content, FONT.heading, true) : sized(content, FONT.body)}</p>\n${blankLine}`;
 const numbers = text => String(text).normalize('NFKC').replace(/(?<=\d),(?=\d)/g, '').match(/\d+(?:\.\d+)?/g) || [];
 const measurements = text => (String(text).normalize('NFKC').replace(/(?<=\d),(?=\d)/g, '').match(/\d+(?:\.\d+)?\s*(?:만\s*원|억\s*원|천\s*원|억|만원|원|m2|평|층|분|시간|km|m|룸|개|톤|%)/g) || []).map(x=>x.replace(/\s/g,'').replace(/(억|만|천)원$/,'$1'));
 export const officeFingerprint = office => hash(office);
@@ -51,7 +57,7 @@ export function renderPost(post, listing, strategy, office, runDir) {
       if (block.section_id) requireThat(strategy.sections.some(s => s.id === block.section_id), 'unknown strategy section');
       texts.push(text);
       md.push((block.type === 'heading' ? '## ' : '') + text, '');
-      html.push(centered(inline(text), block.type === 'heading' ? 'h2' : 'p'));
+      html.push(centered(inline(text), block.type === 'heading' ? 'heading' : 'body'));
     } else if (block.type === 'image') {
       requireThat(['photo', 'thumbnail', 'cta_banner'].includes(block.role), 'image role required');
       requireThat(nonempty(block.alt) && nonempty(block.path), 'image needs alt/path');
@@ -77,7 +83,7 @@ export function renderPost(post, listing, strategy, office, runDir) {
       // Dr-Min cb866fe 실측: 스타일 없는 표는 네이버 편집기에서 테두리 없는 흰 표(50:50)로 바뀐다.
       // 편집기 변환에서 살아남는 인라인 스타일: 테두리 #d9dde2, 첫 열 배경 #f5f6f8 + 굵게, 28:72 폭, padding 8px.
       // '항목/내용' 머리 행은 잡음이라 넣지 않는다.
-      html.push(`<table style="${tableStyle}"><colgroup><col style="width:28%"><col style="width:72%"></colgroup><tbody>${rows.map(r => `<tr><td style="${cellStyle}background-color:#f5f6f8;width:28%"><b>${esc(r[0])}</b></td><td style="${cellStyle}width:72%">${inline(r[1])}</td></tr>`).join('')}</tbody></table>\n${blankLine}`);
+      html.push(`<table style="${tableStyle}"><colgroup><col style="width:28%"><col style="width:72%"></colgroup><tbody>${rows.map(r => `<tr><td style="${cellStyle}background-color:#f5f6f8;width:28%">${sized(esc(r[0]), FONT.table, true)}</td><td style="${cellStyle}width:72%">${sized(inline(r[1]), FONT.table)}</td></tr>`).join('')}</tbody></table>\n${blankLine}`);
     } else if (block.type === 'map') {
       checkText({text: block.query, fact_ids: block.fact_ids}, listing, office);
       requireThat(block.fact_ids.length, 'map query needs confirmed location');

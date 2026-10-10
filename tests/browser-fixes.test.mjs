@@ -148,8 +148,28 @@ test('condition table keeps the measured Naver styling: borders, shaded bold lab
   const table = html.match(/<table[\s\S]*?<\/table>/)[0];
   assert.match(table, /border-collapse:collapse/);
   assert.match(table, /border:1px solid #d9dde2/);
-  assert.match(table, /background-color:#f5f6f8;width:28%"><b>/);
+  assert.match(table, /background-color:#f5f6f8;width:28%"><span style="font-size:15px;font-weight:700;">/);
   assert.match(table, /width:72%/);
   assert.doesNotMatch(table, /<th|>항목</);
   assert.match(table, /text-align: center/);
+});
+
+test('font sizes are explicit on every block: body 16px, headings 24px bold, table 15px; emphasis uses measured spans', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rnb-font-'));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  fs.writeFileSync(path.join(dir, 'sample.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXgAAAABJRU5ErkJggg==', 'base64'));
+  const flow = new Workflow(dir);
+  const {listing, strategy, post} = fixture(factory);
+  post.blocks.splice(1, 0, {type: 'paragraph', text: '층고는 **8.5m**이고 ==40피트== 진입이 됩니다.', fact_ids: ['conditions']});
+  flow.listing(listing); flow.propose(strategy);
+  flow.approve({listing_hash: hash(listing), strategy_hash: hash(strategy), user_quote: '테스트 시뮬레이션: 이 전략으로 진행'});
+  try { flow.prepare(post, office, 'fixture-blog'); } catch (e) { if (!/unsupported number 40/.test(e.message)) throw e; post.blocks[1].text = '층고는 **8.5m**이고 ==높은 층고==가 장점입니다.'; flow.prepare(post, office, 'fixture-blog'); }
+  const html = fs.readFileSync(path.join(dir, 'transfer.html'), 'utf8');
+  const paras = html.split('\n').filter(l => l.startsWith('<p'));
+  assert.ok(paras.length > 5);
+  for (const p of paras) assert.match(p, /<span style="font-size:(16|24)px;/, p);
+  assert.match(html, /<span style="font-size:24px;font-weight:700;">/);
+  assert.doesNotMatch(html, /<h2|<strong>|<mark>/);
+  assert.match(html, /<span style="font-weight:700;">8\.5m<\/span>/);
+  assert.match(html, /<span style="background-color:#fff3b0;">/);
 });

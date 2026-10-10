@@ -94,7 +94,7 @@ flowchart LR
 - 문의하면 무엇을 안내받는지 설명하는 상담 문구와 연락처
 - 위치가 정확히 확인된 경우 지도
 
-기본은 편안한 존댓말과 짧은 문장입니다. 한 문장마다 문단을 나누고, 문장 사이에 빈 줄 한 줄을 두며, 본문·소제목·사진 설명·표·연락처를 가운데 정렬합니다. 기존 블로그의 공개 매물 글을 최대 5개 읽어 문체를 저장할 수 있습니다.
+기본은 편안한 존댓말과 짧은 문장입니다. 글자는 본문 16px, 소제목 24px 굵게, 조건표 15px로 맞춥니다. 한 문장마다 문단을 나누고, 문장 사이에 빈 줄 한 줄을 두며, 본문·소제목·사진 설명·표·연락처를 가운데 정렬합니다. 기존 블로그의 공개 매물 글을 최대 5개 읽어 문체를 저장할 수 있습니다.
 
 ## 믿고 확인할 수 있는 작업 원칙
 
@@ -136,6 +136,6 @@ $realtor-naver-blog
 
 ## 검증과 출처
 
-저장소 루트에서 `npm test`(52개)와 `node realtor-naver-blog/scripts/check-core.mjs`로 확인합니다. 내장 브라우저 동작은 코드 테스트로 확인할 수 없어 [TESTING.md](TESTING.md)대로 Codex 앱에서 확인합니다.
+저장소 루트에서 `npm test`(53개)와 `node realtor-naver-blog/scripts/check-core.mjs`로 확인합니다. 내장 브라우저 동작은 코드 테스트로 확인할 수 없어 [TESTING.md](TESTING.md)대로 Codex 앱에서 확인합니다.
 
 [Dr-Min/naver-realtor-blog-pro](https://github.com/Dr-Min/naver-realtor-blog-pro)의 수집·전송 실측 교훈과 Eziwork v0.3의 전략 확정·문체·재열람 흐름을 합쳤습니다. OpenAI나 네이버의 공식 제품은 아닙니다.

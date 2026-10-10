@@ -160,7 +160,7 @@ test('CLI exposes context-save and the full memory lifecycle using the selected 
 test('latest centered layout and actual blank lines survive preparation',t=>{
   const {flow,listing,strategy,post,dir}=setup(t).run();flow.propose(strategy);confirm(flow);flow.prepare(post,office,'fixture');
   const html=fs.readFileSync(path.join(dir,'transfer.html'),'utf8');
-  assert.ok(html.includes('<p style="text-align: center"><br></p>'));
+  assert.ok(html.includes('<p style="text-align: center"><span style="font-size:16px;"><br></span></p>'));
   assert.ok(/<td style="[^"]*text-align: center[^"]*">/.test(html));
   assert.equal(hash(flow.read('facts.json')),hash(listing));
 });
