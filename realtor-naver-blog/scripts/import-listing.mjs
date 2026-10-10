@@ -45,9 +45,9 @@ export function resolveListingInput(input) {
     };
   }
   if (/^https?:\/\//.test(text)) {
-    return {ok: false, error: "not_naver_listing_url", hint: "네이버부동산 매물 링크가 아닙니다. 자연어·사진 입력 경로로 진행합니다."};
+    return {ok: false, error: "not_naver_listing_url", detail_url: text, hint: "네이버가 아닌 매물 사이트 링크입니다. 내장 브라우저로 이 페이지를 열어 게시된 사실과 사진을 수집하고 자연어 경로로 진행합니다."};
   }
-  return {ok: false, error: "no_article_number", hint: "6자리 이상 숫자 매물번호나 매물 상세 링크가 필요합니다."};
+  return {ok: false, error: "no_article_number", hint: "네이버 매물번호(6자리 이상)가 아닙니다. 6자리 미만 숫자는 다른 매물 사이트의 자체 번호일 수 있으니 다시 묻지 말고 자연어·사진 경로로 진행합니다."};
 }
 
 export function normalizeImageUrl(value) {
