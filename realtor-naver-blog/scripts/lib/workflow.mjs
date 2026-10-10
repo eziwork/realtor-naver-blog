@@ -32,6 +32,8 @@ export class Workflow {
   }
   propose(data) {
     const listing = this.read('facts.json');
+    // 미확인 항목은 전략 확인 사항에 반드시 보여야 한다. 빠뜨려서 propose가 실패·재시도하던 것을(10-10 실행) 코드가 채운다.
+    if (Array.isArray(data.checks) && Array.isArray(listing.unknowns)) data = {...data, checks: [...new Set([...listing.unknowns, ...data.checks])]};
     validateStrategy(data, listing);
     const context = fs.existsSync(path.join(this.dir,'broker-context.json')) ? this.read('broker-context.json') : null;
     requireThat(context?.listing_hash !== hash(listing) || context.status !== 'asked', 'record answered, skipped or unanswered before proposing');
@@ -72,7 +74,14 @@ export class Workflow {
     const state = this.approved();
     const listing = this.read('facts.json'), strategy = this.read('strategy.json');
     const used = new Set((strategy.fact_coverage || []).filter(r => r.decision === 'use').map(r => r.fact_id));
-    const facts = listing.facts.filter(f => f.status === 'confirmed' && used.has(f.id));
+    const usedFacts = listing.facts.filter(f => f.status === 'confirmed' && used.has(f.id));
+    // 조건표는 핵심 조건만(최대 12행). 10-10 실행에서 사용 사실 전부(28행)가 표로 들어가 읽기 어려웠다.
+    // fact_coverage에 in_table을 적으면 그대로 따르고, 없으면 핵심 조건 이름으로 고른다. 나머지는 본문에 쓴다.
+    const marked = (strategy.fact_coverage || []).filter(r => r.in_table === true).map(r => r.fact_id);
+    const KEY = /가격|매매가|보증금|월세|전세|관리비|면적|평|층|방|욕실|화장실|입주|주차|엘리베이터|승강기|방향|준공|사용승인|난방|용도|층고|전력|대지|진입|옵션|반려/;
+    const picked = marked.length ? usedFacts.filter(f => marked.includes(f.id)) : usedFacts.filter(f => KEY.test(f.label));
+    const facts = (picked.length ? picked : usedFacts).slice(0, 12);
+    const bodyFacts = usedFacts.filter(f => !facts.includes(f));
     const photoBlock = p => ({type: 'image', role: 'photo', photo_id: p.id, path: p.path, alt: p.label || 'TODO 사진 설명', reviewed: false});
     const placed = new Set();
     const blocks = [
@@ -99,8 +108,9 @@ export class Workflow {
       title: {text: 'TODO 제목', fact_ids: [...strategy.interpretation.fact_ids]},
       blocks, excluded_photos: [], map_omission_reason: 'TODO 지도를 넣으면 이 줄을 지우고 map 블록 추가', tags: [], tag_fact_ids: []
     };
+    template.body_facts_todo = bodyFacts.map(f => ({fact_id: f.id, label: f.label, value: f.value}));
     this.put('post-template.json', template);
-    return {template: path.join(this.dir, 'post-template.json'), photos: listing.photos.length, table_rows: facts.length, office_hash: officeFingerprint(office)};
+    return {template: path.join(this.dir, 'post-template.json'), photos: listing.photos.length, table_rows: facts.length, body_facts: bodyFacts.length, office_hash: officeFingerprint(office)};
   }
   prepare(post, office, blog) {
     const state = this.approved();

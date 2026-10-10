@@ -13,57 +13,68 @@
 
 ## 빠른 경로 (기본): 브라우저 호출 2번으로 수집 끝내기
 
-아래 두 셀은 2026-10-10 실제 실행에서 동작이 확인된 API(`cua.createBrowserTab("iab", …)`, `tab.playwright.evaluate`, `tab.playwright.domSnapshot`, `tab.capabilities.get('pageAssets')`, `list()`, `bundle()`)만 쓴다. 페이지 안 `fetch` 허용 여부는 아직 미확인이라 결과를 그대로 기록한다. 셀을 쪼개 한 단계씩 실행하지 않는다. 실패한 부분만 아래 상세 절차로 보완한다.
+**실측(2026-10-10, v0.6.3 실행): 내장 브라우저의 `evaluate`는 읽기 전용이라 `fetch`가 없다** (`TypeError: fetch is not a function`). 페이지 안에서 API를 부를 수 없으므로, API 주소를 **별도 탭으로 직접 열어** 화면에 뜬 JSON을 읽는다(첫 실측 필요). DOM 읽기·`node:fs` 파일 쓰기·`pageAssets`는 실제 실행에서 동작이 확인됐다. 셀을 쪼개지 않는다. 결과 파일은 셀이 직접 쓴다 — 화면 글자를 모델이 다시 타이핑해 파일로 옮기지 않는다(10-10 실행에서 이 단계에 약 1분 소요).
 
-**셀 1 — 열기 + API 3종 + 장수 + 화면 글자**
+**셀 1 — 상세 화면 읽기 + API 3종(탭 이동 방식)**
 
 ```js
 const no = "<매물번호>";
+const run = "<init-run이 만든 run 폴더 절대경로>";
 var listingTab = await cua.createBrowserTab("iab", `https://fin.land.naver.com/articles/${no}`, {visible: true});
-var collected = await listingTab.playwright.evaluate(async (no) => {
-  const wait = ms => new Promise(r => setTimeout(r, ms));
-  for (let i = 0; i < 20 && !document.body.innerText.includes('매물번호'); i++) await wait(300);
-  const get = async (p) => {
-    let last = {status: 0, body: null};
-    for (let i = 0; i < 2; i++) {
-      try {
-        const r = await fetch('/front-api/v1/' + p, {headers: {accept: 'application/json'}});
-        last = {status: r.status, body: r.status === 200 ? await r.json() : null};
-        if (r.status === 200) return last;
-      } catch (e) { last = {status: 0, body: null, error: String(e)}; }
-      await wait(1200);
-    }
-    return last;
-  };
-  const key = await get(`article/key?articleNumber=${no}`);
-  const t = key.body?.result?.type || {};
-  const basic_info = await get(`article/basicInfo?articleNumber=${no}&realEstateType=${t.realEstateType || ''}&tradeType=${t.tradeType || ''}`);
-  const gallery = await get(`article/galleryImages?articleNumber=${no}`);
-  const text = document.body.innerText;
-  const ui = text.match(/이미지\s*(\d+)\s*개/);
-  return {key, basic_info, gallery, not_found: /찾을 수 없/.test(text), ui_photo_count: ui ? Number(ui[1]) : null, page_text: text.slice(0, 6000)};
-}, no).catch(e => ({evaluate_error: String(e)}));
-nodeRepl.write(JSON.stringify({evaluate_error: collected.evaluate_error, statuses: [collected.key?.status, collected.basic_info?.status, collected.gallery?.status], gallery_count: collected.gallery?.body?.result?.length ?? null, ui_photo_count: collected.ui_photo_count, not_found: collected.not_found}));
+var page = await listingTab.playwright.evaluate(() => {
+  const t = document.body.innerText;
+  const ui = t.match(/이미지\s*(\d+)\s*개/);
+  const nd = document.getElementById('__NEXT_DATA__')?.textContent || null;
+  return {not_found: /찾을 수 없/.test(t), ui_photo_count: ui ? Number(ui[1]) : null, page_text: t.slice(0, 6000), next_data: nd ? nd.slice(0, 200000) : null};
+});
+var apiTab = await cua.createBrowserTab("iab", "about:blank", {visible: false});
+const readJson = async (p) => {
+  try {
+    await apiTab.goto('https://fin.land.naver.com/front-api/v1/' + p);
+    const txt = await apiTab.playwright.evaluate(() => document.body.innerText);
+    try { const body = JSON.parse(txt); return {status: body?.result ? 200 : 0, body, error: body?.result ? null : 'no result: ' + txt.slice(0, 160)}; }
+    catch { return {status: 0, body: null, error: 'not json: ' + txt.slice(0, 160)}; }
+  } catch (e) { return {status: 0, body: null, error: String(e).slice(0, 200)}; }
+};
+const key = await readJson(`article/key?articleNumber=${no}`);
+const t = key.body?.result?.type || {};
+const basic_info = await readJson(`article/basicInfo?articleNumber=${no}&realEstateType=${t.realEstateType || ''}&tradeType=${t.tradeType || ''}`);
+const gallery = await readJson(`article/galleryImages?articleNumber=${no}`);
+var api = {key, basic_info, gallery};
+const apiOk = [key, basic_info, gallery].every(x => x.status === 200);
+var apiAttempt = {tried: true, ok: apiOk, method: 'tab_navigation', error: apiOk ? null : [key, basic_info, gallery].map(x => x.error).filter(Boolean).join(' | ')};
+nodeRepl.write(JSON.stringify({apiAttempt, gallery_count: gallery.body?.result?.length ?? null, ui_photo_count: page.ui_photo_count, not_found: page.not_found, has_next_data: !!page.next_data}));
 ```
 
-**셀 2 — 갤러리 전부 로드 + 한 번에 저장**
+- API 화면에 로그인·약관 동의 페이지가 뜨면(`not json`) 사용자에게 내장 브라우저에서 네이버 로그인과 **네이버파이낸셜 약관 동의**를 한 번 해 달라고 요청한다(Dr-Min 2edd22c 실측: 약관 동의가 선행돼야 front-api가 응답한다). 동의 후 셀 1을 한 번 더 실행한다.
+- API가 끝내 안 되면 `page.next_data`(페이지에 내장된 데이터)와 `page_text`로 사실을 정리한다.
+
+**셀 2 — 갤러리 전부 로드 + 한 번에 저장 + capture 파일 직접 쓰기**
 
 ```js
-const want = collected.gallery?.body?.result?.length || collected.ui_photo_count || 1;
+const want = gallery.body?.result?.length || page.ui_photo_count || 1;
 await listingTab.playwright.getByRole('button', {name: /이미지\s*\d+\s*개|매물 대표 이미지/}).first().click().catch(() => {});
 for (let i = 0; i < want; i++) { await listingTab.pressKey(null, 'ArrowRight').catch(() => {}); await new Promise(r => setTimeout(r, 250)); }
 const photoAssets = await listingTab.capabilities.get('pageAssets');
 const inv = await photoAssets.list();
 const isListingPhoto = a => a.kind === 'image' && /landthumb-phinf|land-phinf/.test(a.url);
-// 같은 사진의 여러 크기 중 가장 큰 것 하나만 고른다(?type= 숫자가 크거나 파라미터 없는 원본 우선).
 const sizeOf = u => { const m = u.match(/[?&]type=[a-z]*(\d+)/i); return m ? Number(m[1]) : 1e9; };
 const best = new Map();
 for (const a of inv.assets.filter(isListingPhoto)) { const k = a.url.split('?')[0]; if (!best.has(k) || sizeOf(a.url) > sizeOf(best.get(k).url)) best.set(k, a); }
 var photoBundle = await photoAssets.bundle({inventoryId: inv.id, assetIds: [...best.values()].map(a => a.id)});
+const capture = {
+  schema_version: 'browser-capture-1.0', article_no: no, source_url: `https://fin.land.naver.com/articles/${no}`,
+  captured_at: new Date().toISOString(), not_found: page.not_found,
+  method: apiAttempt.ok ? 'api_tab' : 'dom', api_attempt: apiAttempt, api: apiAttempt.ok ? api : null,
+  page_text: page.page_text, ui_photo_count: page.ui_photo_count,
+  photos: [...photoBundle.assets.map(a => ({url: a.url, file: a.path, reason: null})), ...photoBundle.failures.map(f => ({url: f.url, file: null, reason: f.reason}))],
+  notes: []
+};
+await (await import('node:fs/promises')).writeFile(`${run}/browser-capture.json`, JSON.stringify(capture, null, 2));
 nodeRepl.write(JSON.stringify({want, found: best.size, downloaded: photoBundle.summary, failures: photoBundle.failures.length}));
 ```
 
-그다음 셸에서 `browser-capture.json`을 **한 번에** 쓰고(`api_attempt: {tried:true, ok:<세 status가 모두 200>, error:<evaluate_error 또는 null>}`, `method: ok ? "page_fetch" : "dom"`, `photos: photoBundle.assets.map(a => ({url:a.url, file:a.path, reason:null}))` + `failures`는 `file:null`), 바로 `import-listing.mjs import`를 실행한다. `complete:true`면 상세 절차는 건너뛴다.
+그다음 바로 `node scripts/import-listing.mjs import --run <run> --capture <run>/browser-capture.json`을 실행한다. `complete:true`면 아래 상세 절차는 건너뛴다. `notes`를 쓸 때는 **한국어**로 쓴다(10-10 실행에서 일본어 메모가 남은 사례).
 
 ## 1. 상세 페이지 열기
 
@@ -81,7 +92,7 @@ nodeRepl.write(JSON.stringify({want, found: best.size, downloaded: photoBundle.s
 
 순서:
 
-1. **페이지 안 GET 시도 (필수).** `tab.playwright.evaluate`로 같은 출처 `fetch(url, {headers:{accept:'application/json'}})`를 실행해 `{status, body}`를 받는다. 실패하면 1.2초 뒤 한 번만 재시도한다. **시도 결과를 성공·실패 모두 `api_attempt`에 기록한다**(`{tried:true, ok, error}`). 시도하지 않고 2번으로 건너뛰지 않는다. evaluate가 읽기 전용 범위라 fetch가 막히면 그 오류 문구를 그대로 남긴다.
+1. **API 시도 (필수).** 내장 브라우저 `evaluate`에는 `fetch`가 없다(10-10 실측). 위 셀 1처럼 API 주소를 별도 탭으로 열어 JSON을 읽는다. 실패하면 1.2초 뒤 한 번만 재시도한다. **시도 결과를 성공·실패 모두 `api_attempt`에 기록한다**(`{tried:true, ok, error}`). 시도하지 않고 2번으로 건너뛰지 않는다. evaluate가 읽기 전용 범위라 fetch가 막히면 그 오류 문구를 그대로 남긴다.
    - 막히면 개발자 모드 CDP(`tab.capabilities.get("cdp")`)로 페이지를 다시 읽으며 Network 응답에서 같은 3종 API 본문을 받을 수 있다. CDP는 사이트별 승인이 필요하므로 사용자에게 fin.land.naver.com 읽기 목적임을 밝혀 묻는다. 승인이 없으면 2번으로 간다.
 2. **화면 텍스트.** `domSnapshot()` 또는 탭 텍스트로 상세 화면의 '기본 정보' 표와 가격·면적·층·입주 정보를 읽는다. `page_text`에 원문을 그대로 보관한다. 이 경우 `api`는 `null`이다.
 3. 화면의 "이미지 N개 보기" 숫자를 **반드시** `ui_photo_count`로 기록한다. 숫자가 화면에 없으면 갤러리 뷰어의 "1/N" 표기를 읽는다. 둘 다 없을 때만 `null`이며 그 이유를 notes에 남긴다.

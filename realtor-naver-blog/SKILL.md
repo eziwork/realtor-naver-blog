@@ -22,6 +22,7 @@ description: "Codex 내장 브라우저만 사용하는 버전(Playwright·Chrom
 
 2026-10-10 실행 분석: 8분 중 대부분이 문서 재독, 소스 코드 열람, JSON 파일을 하나씩 쓰는 왕복, 별도 업로드 동의 질문, 사진별 개별 호출이었다.
 
+0. 모든 기록·메모·보고는 **한국어**로 쓴다(10-10 실행에서 capture 메모가 일본어로 남은 사례).
 1. 참조 문서는 해당 단계 시작 때 **한 번만** 읽는다. `scripts/` 소스 코드는 읽지 않는다 — 필요한 값은 명령이 준다(`workflow.mjs office-hash`, `post-template`).
 2. 브라우저 작업은 [browser-collect.md](references/browser-collect.md)·[transfer-contract.md](references/transfer-contract.md)의 **빠른 경로 셀**을 그대로 쓴다. 한 동작마다 셀을 나누지 않는다.
 3. 서로 의존하지 않는 셸 작업(facts·context·strategy 파일 쓰기, 썸네일·배너 생성)은 한 번에 묶어 실행한다.

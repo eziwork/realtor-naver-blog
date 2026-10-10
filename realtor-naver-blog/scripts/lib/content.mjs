@@ -15,8 +15,14 @@ const blankLine = `<p style="${centerStyle}">${sized('<br>', FONT.body)}</p>`;
 const tableStyle = 'border-collapse:collapse;width:100%';
 const cellStyle = `border:1px solid #d9dde2;padding:8px;${centerStyle};`;
 const centered = (content, kind = 'body') => `<p style="${centerStyle}">${kind === 'heading' ? sized(content, FONT.heading, true) : sized(content, FONT.body)}</p>\n${blankLine}`;
-const numbers = text => String(text).normalize('NFKC').replace(/(?<=\d),(?=\d)/g, '').match(/\d+(?:\.\d+)?/g) || [];
-const measurements = text => (String(text).normalize('NFKC').replace(/(?<=\d),(?=\d)/g, '').match(/\d+(?:\.\d+)?\s*(?:만\s*원|억\s*원|천\s*원|억|만원|원|m2|평|층|분|시간|km|m|룸|개|톤|%)/g) || []).map(x=>x.replace(/\s/g,'').replace(/(억|만|천)원$/,'$1'));
+// 숫자 비교 전 정규화 (2026-10-10 실행에서 prepare가 오탐으로 3번 실패):
+// - 쉼표는 천 단위(뒤에 정확히 3자리)일 때만 지운다. "현대1,2차"를 12로 합치지 않는다.
+// - 날짜 1976.06.07 / 1976-6-7 / 1976년 6월 7일을 같은 숫자로 본다. 앞자리 0은 무시한다.
+const normalizeNumbers = text => String(text).normalize('NFKC')
+  .replace(/(\d{4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})\.?/g, '$1년 $2월 $3일')
+  .replace(/(?<=\d),(?=\d{3}(?!\d))/g, '');
+const numbers = text => (normalizeNumbers(text).match(/\d+(?:\.\d+)?/g) || []).map(x => x.replace(/^0+(?=\d)/, ''));
+const measurements = text => (normalizeNumbers(text).match(/\d+(?:\.\d+)?\s*(?:만\s*원|억\s*원|천\s*원|억|만원|원|m2|평|층|분|시간|km|m|룸|개|톤|%)/g) || []).map(x=>x.replace(/\s/g,'').replace(/(억|만|천)원$/,'$1'));
 export const officeFingerprint = office => hash(office);
 export function telephone(value) {
   const number = String(value ?? '').replace(/[\s()-]/g, '');

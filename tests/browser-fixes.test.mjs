@@ -173,3 +173,48 @@ test('font sizes are explicit on every block: body 16px, headings 24px bold, tab
   assert.match(html, /<span style="font-weight:700;">8\.5m<\/span>/);
   assert.match(html, /<span style="background-color:#fff3b0;">/);
 });
+
+test('number check: "현대1,2차" is not 12, and 1976.06.07 equals 1976년 6월 7일', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rnb-num-'));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  fs.writeFileSync(path.join(dir, 'sample.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXgAAAABJRU5ErkJggg==', 'base64'));
+  const flow = new Workflow(dir);
+  const {listing, strategy, post} = fixture(factory);
+  listing.facts.push({id: 'complex', label: '단지', value: '현대1,2차', status: 'confirmed', source_ids: ['input']});
+  listing.facts.push({id: 'built', label: '사용승인', value: '1976.06.07', status: 'confirmed', source_ids: ['input']});
+  strategy.fact_coverage.push({fact_id: 'complex', decision: 'use', reason: '제목'}, {fact_id: 'built', decision: 'use', reason: '표'});
+  post.listing_hash = hash(listing); post.strategy_hash = hash(strategy);
+  post.blocks.splice(1, 0, {type: 'paragraph', text: '현대1·2차 단지이며 1976년 6월 7일에 사용승인됐습니다.', fact_ids: ['complex', 'built']});
+  flow.listing(listing); flow.propose(strategy);
+  flow.approve({listing_hash: hash(listing), strategy_hash: hash(strategy), user_quote: '테스트 시뮬레이션: 이 전략으로 진행'});
+  flow.prepare(post, office, 'fixture-blog');
+  post.blocks[1].text = '현대12차 단지입니다.';
+  assert.throws(() => flow.prepare(post, office, 'fixture-blog'), /unsupported number 12/);
+});
+
+test('propose adds missing unknowns to checks instead of failing', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rnb-unk-'));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  const flow = new Workflow(dir);
+  const {listing, strategy} = fixture(factory);
+  flow.listing(listing);
+  flow.propose({...strategy, checks: []});
+  assert.deepEqual(flow.read('strategy.json').checks, listing.unknowns);
+});
+
+test('post-template keeps the condition table to key specs (max 12) and lists the rest for prose', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rnb-rows-'));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  const flow = new Workflow(dir);
+  const {listing, strategy} = fixture(factory);
+  for (let i = 0; i < 20; i++) listing.facts.push({id: 'x' + i, label: i % 2 ? '관리비 항목' + i : '주변 시설' + i, value: '값' + i, status: 'confirmed', source_ids: ['input']});
+  strategy.fact_coverage = listing.facts.filter(f => f.status === 'confirmed').map(f => ({fact_id: f.id, decision: 'use', reason: '사용'}));
+  flow.listing(listing); flow.propose(strategy);
+  flow.approve({listing_hash: hash(listing), strategy_hash: hash(flow.read('strategy.json')), user_quote: '테스트 시뮬레이션: 이 전략으로 진행'});
+  const out = flow.postTemplate(office);
+  assert.ok(out.table_rows <= 12);
+  const tpl = JSON.parse(fs.readFileSync(out.template, 'utf8'));
+  const rows = tpl.blocks.find(b => b.type === 'table').rows;
+  assert.ok(rows.every(r => /관리비/.test(r.label)), 'key specs chosen by label');
+  assert.ok(tpl.body_facts_todo.some(f => /주변 시설/.test(f.label)), 'others left for prose');
+});
