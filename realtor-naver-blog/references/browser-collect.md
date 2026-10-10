@@ -10,6 +10,60 @@
 - `map_url_has_no_article_number` → 지도 공유 링크에는 번호가 없다(실측). 상세 링크나 '기본 정보' 표 하단의 매물번호를 한 번 요청한다.
 - `not_naver_listing_url` / `no_article_number` → 자연어·사진 입력 경로로 진행한다.
 
+## 빠른 경로 (기본): 브라우저 호출 2번으로 수집 끝내기
+
+아래 두 셀은 2026-10-10 실제 실행에서 동작이 확인된 API(`cua.createBrowserTab("iab", …)`, `tab.playwright.evaluate`, `tab.playwright.domSnapshot`, `tab.capabilities.get('pageAssets')`, `list()`, `bundle()`)만 쓴다. 페이지 안 `fetch` 허용 여부는 아직 미확인이라 결과를 그대로 기록한다. 셀을 쪼개 한 단계씩 실행하지 않는다. 실패한 부분만 아래 상세 절차로 보완한다.
+
+**셀 1 — 열기 + API 3종 + 장수 + 화면 글자**
+
+```js
+const no = "<매물번호>";
+var listingTab = await cua.createBrowserTab("iab", `https://fin.land.naver.com/articles/${no}`, {visible: true});
+var collected = await listingTab.playwright.evaluate(async (no) => {
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  for (let i = 0; i < 20 && !document.body.innerText.includes('매물번호'); i++) await wait(300);
+  const get = async (p) => {
+    let last = {status: 0, body: null};
+    for (let i = 0; i < 2; i++) {
+      try {
+        const r = await fetch('/front-api/v1/' + p, {headers: {accept: 'application/json'}});
+        last = {status: r.status, body: r.status === 200 ? await r.json() : null};
+        if (r.status === 200) return last;
+      } catch (e) { last = {status: 0, body: null, error: String(e)}; }
+      await wait(1200);
+    }
+    return last;
+  };
+  const key = await get(`article/key?articleNumber=${no}`);
+  const t = key.body?.result?.type || {};
+  const basic_info = await get(`article/basicInfo?articleNumber=${no}&realEstateType=${t.realEstateType || ''}&tradeType=${t.tradeType || ''}`);
+  const gallery = await get(`article/galleryImages?articleNumber=${no}`);
+  const text = document.body.innerText;
+  const ui = text.match(/이미지\s*(\d+)\s*개/);
+  return {key, basic_info, gallery, not_found: /찾을 수 없/.test(text), ui_photo_count: ui ? Number(ui[1]) : null, page_text: text.slice(0, 6000)};
+}, no).catch(e => ({evaluate_error: String(e)}));
+nodeRepl.write(JSON.stringify({evaluate_error: collected.evaluate_error, statuses: [collected.key?.status, collected.basic_info?.status, collected.gallery?.status], gallery_count: collected.gallery?.body?.result?.length ?? null, ui_photo_count: collected.ui_photo_count, not_found: collected.not_found}));
+```
+
+**셀 2 — 갤러리 전부 로드 + 한 번에 저장**
+
+```js
+const want = collected.gallery?.body?.result?.length || collected.ui_photo_count || 1;
+await listingTab.playwright.getByRole('button', {name: /이미지\s*\d+\s*개|매물 대표 이미지/}).first().click().catch(() => {});
+for (let i = 0; i < want; i++) { await listingTab.pressKey(null, 'ArrowRight').catch(() => {}); await new Promise(r => setTimeout(r, 250)); }
+const photoAssets = await listingTab.capabilities.get('pageAssets');
+const inv = await photoAssets.list();
+const isListingPhoto = a => a.kind === 'image' && /landthumb-phinf|land-phinf/.test(a.url);
+// 같은 사진의 여러 크기 중 가장 큰 것 하나만 고른다(?type= 숫자가 크거나 파라미터 없는 원본 우선).
+const sizeOf = u => { const m = u.match(/[?&]type=[a-z]*(\d+)/i); return m ? Number(m[1]) : 1e9; };
+const best = new Map();
+for (const a of inv.assets.filter(isListingPhoto)) { const k = a.url.split('?')[0]; if (!best.has(k) || sizeOf(a.url) > sizeOf(best.get(k).url)) best.set(k, a); }
+var photoBundle = await photoAssets.bundle({inventoryId: inv.id, assetIds: [...best.values()].map(a => a.id)});
+nodeRepl.write(JSON.stringify({want, found: best.size, downloaded: photoBundle.summary, failures: photoBundle.failures.length}));
+```
+
+그다음 셸에서 `browser-capture.json`을 **한 번에** 쓰고(`api_attempt: {tried:true, ok:<세 status가 모두 200>, error:<evaluate_error 또는 null>}`, `method: ok ? "page_fetch" : "dom"`, `photos: photoBundle.assets.map(a => ({url:a.url, file:a.path, reason:null}))` + `failures`는 `file:null`), 바로 `import-listing.mjs import`를 실행한다. `complete:true`면 상세 절차는 건너뛴다.
+
 ## 1. 상세 페이지 열기
 
 1. 작업 탭에서 `detail_url`을 연다. 이미 같은 URL이면 다시 goto하지 않는다.

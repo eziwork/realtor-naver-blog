@@ -98,7 +98,9 @@ export function importCapture(runDir, capture, {acceptIncomplete = null} = {}) {
   const thumbnailUrls = new Set();
   for (const item of captured) {
     const url = normalizeImageUrl(item.url);
-    if (url && /[?&]type=/.test(String(item.url))) thumbnailUrls.add(url);
+    // 실측: 대표 썸네일은 ?type=m562. 800px 미만 리사이즈 파라미터만 썸네일로 본다.
+    const size = String(item.url).match(/[?&]type=[a-z]*(\d+)/i);
+    if (url && size && Number(size[1]) < 800) thumbnailUrls.add(url);
     if (url && !byUrl.has(url)) byUrl.set(url, item);
   }
   const expectedUrls = apiImages

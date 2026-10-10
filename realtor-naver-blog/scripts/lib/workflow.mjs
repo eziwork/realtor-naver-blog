@@ -51,13 +51,13 @@ export class Workflow {
     state.broker_context={path:'broker-context.json',status:context.status,listing_hash:context.listing_hash};
     this.save(state); return context;
   }
-  approve({strategy_hash, listing_hash, user_quote}) {
+  approve({strategy_hash, listing_hash, user_quote, upload_consent = null}) {
     const state = this.state();
     requireThat(state.phase === 'awaiting_strategy_confirmation', 'no strategy awaiting confirmation');
     requireThat(nonempty(user_quote), 'record the actual user confirmation, never infer it');
     requireThat(strategy_hash === state.strategy_hash && listing_hash === state.listing_hash, 'confirmation is for a different revision');
     requireThat(hash(this.read('facts.json')) === listing_hash && hash(this.read('strategy.json')) === strategy_hash, 'files changed since recommendation');
-    state.approval = {strategy_hash, listing_hash, user_quote, confirmed_at: new Date().toISOString()};
+    state.approval = {strategy_hash, listing_hash, user_quote, upload_consent: nonempty(upload_consent) ? upload_consent : null, confirmed_at: new Date().toISOString()};
     state.phase = 'strategy_confirmed';
     return this.save(state);
   }
@@ -65,6 +65,42 @@ export class Workflow {
     const state = this.state();
     requireThat(state.approval && state.approval.listing_hash === hash(this.read('facts.json')) && state.approval.strategy_hash === hash(this.read('strategy.json')), 'STRATEGY_CONFIRMATION_REQUIRED');
     return state;
+  }
+  // 확정된 전략·사실·사진으로 post.json 뼈대를 만든다. Codex는 TODO 문장만 채우면 된다.
+  // 해시·사진 경로·배너 office_hash·조건표(사용으로 분류한 사실의 원문 값)를 미리 채워 소스 코드를 읽을 필요가 없게 한다.
+  postTemplate(office) {
+    const state = this.approved();
+    const listing = this.read('facts.json'), strategy = this.read('strategy.json');
+    const used = new Set((strategy.fact_coverage || []).filter(r => r.decision === 'use').map(r => r.fact_id));
+    const facts = listing.facts.filter(f => f.status === 'confirmed' && used.has(f.id));
+    const photoBlock = p => ({type: 'image', role: 'photo', photo_id: p.id, path: p.path, alt: p.label || 'TODO 사진 설명', reviewed: false});
+    const placed = new Set();
+    const blocks = [
+      {type: 'image', role: 'thumbnail', path: 'thumbnail.png', alt: 'TODO 썸네일 설명', reviewed: false},
+      {type: 'paragraph', text: 'TODO 도입 문장', fact_ids: []}
+    ];
+    for (const section of strategy.sections) {
+      blocks.push({type: 'heading', text: 'TODO ' + section.question, fact_ids: [], section_id: section.id});
+      blocks.push({type: 'paragraph', text: 'TODO ' + section.direction, fact_ids: [...section.fact_ids], section_id: section.id});
+      for (const id of section.photo_ids) {
+        const photo = listing.photos.find(p => p.id === id);
+        if (photo && !placed.has(id)) { blocks.push(photoBlock(photo)); placed.add(id); }
+      }
+    }
+    // 사진 전부 싣기: 어느 문단에도 배정되지 않은 사진은 마지막 문단 뒤에 순서대로 둔다.
+    for (const photo of listing.photos) if (!placed.has(photo.id)) blocks.push(photoBlock(photo));
+    blocks.push({type: 'table', rows: facts.map(f => ({label: f.label, text: String(f.value), fact_ids: [f.id]}))});
+    blocks.push({type: 'cta', text: 'TODO 상담 안내 문장(연락처는 쓰지 않는다)', fact_ids: [], benefit: strategy.cta.benefit});
+    blocks.push({type: 'image', role: 'cta_banner', path: 'cta-banner.png', alt: 'TODO 상담 배너 설명', reviewed: false, office_hash: officeFingerprint(office)});
+    const template = {
+      schema_version: '1.0', listing_hash: state.listing_hash, strategy_hash: hash(strategy),
+      fact_review: {completed: false, notes: 'TODO 의미 검수 내용과 제외한 주장'},
+      style: {origin: 'TODO stored|analyzed|default', summary: 'TODO 적용 문체 요약'},
+      title: {text: 'TODO 제목', fact_ids: [...strategy.interpretation.fact_ids]},
+      blocks, excluded_photos: [], map_omission_reason: 'TODO 지도를 넣으면 이 줄을 지우고 map 블록 추가', tags: [], tag_fact_ids: []
+    };
+    this.put('post-template.json', template);
+    return {template: path.join(this.dir, 'post-template.json'), photos: listing.photos.length, table_rows: facts.length, office_hash: officeFingerprint(office)};
   }
   prepare(post, office, blog) {
     const state = this.approved();

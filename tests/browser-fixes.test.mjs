@@ -105,3 +105,32 @@ test('strategy must classify every confirmed fact as use or exclude with a reaso
   const {fact_coverage, ...missing} = strategy;
   assert.throws(() => validateStrategy(missing, listing), /fact_coverage required/);
 });
+
+test('post-template pre-fills hashes, every photo, the fact table and the banner hash', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rnb-template-'));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXgAAAABJRU5ErkJggg==', 'base64');
+  fs.mkdirSync(path.join(dir, 'photos'));
+  for (const f of ['thumbnail.png', 'cta-banner.png', 'photos/01.png', 'photos/02.png']) fs.writeFileSync(path.join(dir, f), png);
+  const {listing, strategy} = fixture(factory);
+  listing.photos = [{id: 'p1', path: 'photos/01.png', label: '외관', source_id: 'input'}, {id: 'p2', path: 'photos/02.png', label: '내부', source_id: 'input'}];
+  strategy.sections[0].photo_ids = ['p2'];
+  const flow = new Workflow(dir);
+  flow.listing(listing); flow.propose(strategy);
+  flow.approve({listing_hash: hash(listing), strategy_hash: hash(strategy), user_quote: '테스트 시뮬레이션: 이 전략으로 진행'});
+  const out = flow.postTemplate(office);
+  assert.equal(out.photos, 2);
+  const tpl = JSON.parse(fs.readFileSync(out.template, 'utf8'));
+  const photoIds = tpl.blocks.filter(b => b.role === 'photo').map(b => b.photo_id);
+  assert.deepEqual(photoIds, ['p2', 'p1'], 'section photo first, then every remaining photo');
+  assert.throws(() => flow.prepare(tpl, office, 'fixture-blog'), /TODO/);
+  const filled = JSON.parse(JSON.stringify(tpl).replace(/"TODO[^"]*"/g, '"채운 문장입니다."'));
+  filled.style = {origin: 'default', summary: '차분한 존댓말'};
+  filled.fact_review = {completed: true, notes: '테스트 검수'};
+  filled.title = {text: '파주 공장 창고 매매 23억', fact_ids: ['location', 'type', 'conditions']};
+  filled.map_omission_reason = '테스트 입력에 상세 위치 없음';
+  for (const b of filled.blocks) if (b.type === 'image') b.reviewed = true;
+  flow.prepare(filled, office, 'fixture-blog');
+  const md = fs.readFileSync(path.join(dir, 'blog-post.md'), 'utf8');
+  assert.ok(md.includes('| conditions | 매매가 23억 원, 연면적 594㎡, 층고 8.5m |'));
+});

@@ -33,6 +33,7 @@ function checkText(item, listing, office, {contact = false} = {}) {
 // A cited fact does not by itself prove that a qualitative claim follows from it.
 export function renderPost(post, listing, strategy, office, runDir) {
   requireThat(post.schema_version === '1.0', 'post schema_version must be 1.0');
+  requireThat(!/\bTODO\b/.test(JSON.stringify(post)), 'post still has TODO placeholders from post-template');
   requireThat(post.strategy_hash === hash(strategy), 'post belongs to an outdated strategy');
   requireThat(post.listing_hash === hash(listing), 'post belongs to outdated listing facts');
   requireThat(post.fact_review?.completed === true && nonempty(post.fact_review.notes), 'Codex fact review is required');

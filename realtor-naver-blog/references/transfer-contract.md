@@ -28,6 +28,30 @@
 
 HTML의 @@IMG:n@@와 @@MAP:n@@가 manifest의 순서에 대응한다.
 
+**빠른 경로 (기본): 사진 전부를 한 셀에서 교체한다.** 2026-10-10 실행에서 한 장씩 따로 호출해 확인한 동작(자리 문단 선택 → 지우기 → filechooser → setFiles → 팝업 닫기)을 반복문으로 묶은 것이다. 장마다 셀을 나누지 않는다.
+
+```js
+const manifest = JSON.parse(await (await import('node:fs/promises')).readFile('<run>/manifest.json', 'utf8'));
+const editorFrame = blogTab.playwright.frameLocator('iframe[name="mainFrame"]');
+const results = [];
+for (let n = 1; n <= manifest.images.length; n++) {
+  try {
+    await editorFrame.getByText(`@@IMG:${n}@@`, {exact: true}).click();
+    await blogTab.pressKey(null, 'Home'); await blogTab.pressKey(null, 'shift+End'); await blogTab.pressKey(null, 'BackSpace');
+    const chooser = blogTab.playwright.waitForEvent('filechooser', {timeoutMs: 10000});
+    await editorFrame.getByRole('button', {name: '사진 추가', exact: true}).click();
+    await (await chooser).setFiles([manifest.images[n - 1].path]);
+    await new Promise(r => setTimeout(r, 1200));
+    await editorFrame.getByRole('button', {name: '팝업 닫기', exact: true}).click({timeoutMs: 1500}).catch(() => {});
+    results.push({n, ok: true});
+  } catch (e) { results.push({n, ok: false, error: String(e).slice(0, 160)}); }
+}
+const check = await editorFrame.getByRole('article').evaluate(el => ({markers: el.textContent.match(/@@(?:IMG|MAP):\d+@@/g), images: Array.from(el.querySelectorAll('img')).filter(i => i.complete && i.naturalWidth > 0).length}));
+nodeRepl.write(JSON.stringify({results, check}));
+```
+
+실패한 n만 아래 규칙으로 다시 넣는다. 지도·배너 링크·전화 링크는 이 셀 다음에 한다.
+
 - 자리 문단을 정확히 선택·제거한 위치에 컴포넌트를 넣는다. Home/Shift+End는 화면 줄 단위일 수 있으므로 삭제 후 마커가 완전히 사라졌는지 확인한다.
 - 사진은 API의 filechooser 대기를 먼저 시작하고 '사진 추가'를 누른다. chooser.setFiles에 manifest의 절대 파일 경로를 전달한다. 여러 장 선택 UI가 나오면 의도한 개별 사진 배치를 선택한다.
 - 이미지 컴포넌트가 나타나는 것뿐 아니라 업로드 완료·실제 로드·개수·순서·캡션을 확인한다. 사진 라이브러리의 삭제 버튼은 사용하지 않는다.

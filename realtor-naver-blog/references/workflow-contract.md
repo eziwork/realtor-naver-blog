@@ -99,6 +99,8 @@ YAML 원본과 기존 필드에 손대지 않는다. 다른 블로그 문체를 
 
 ## 4. post.json → 로컬 산출물
 
+**먼저 `post-template --run <run>`을 실행한다.** `post-template.json`에 해시, 썸네일·사진 전부(문단 배정 사진 먼저, 나머지는 순서대로)·조건표(`fact_coverage`에서 use로 분류한 사실의 원문 값)·CTA benefit·배너 office_hash가 채워진다. `TODO`로 시작하는 문자열만 채우고 이미지를 실제로 본 뒤 `reviewed:true`로 바꿔 post.json으로 저장한다. TODO가 하나라도 남으면 prepare가 실패한다. 배너 해시만 필요하면 `office-hash`.
+
 전략 확정 후 생성. 필수 필드:
 - schema_version: "1.0"
 - listing_hash / strategy_hash: 확정된 입력/전략 해시
@@ -118,7 +120,7 @@ YAML 원본과 기존 필드에 손대지 않는다. 다른 블로그 문체를 
 | map | query, fact_ids |
 | cta | text, fact_ids, benefit(전략과 동일) |
 
-office_hash는 `scripts/lib/content.mjs`의 officeFingerprint(office). 해시 함수는 객체 키 순서를 정규화한다. 모든 이미지 실물 검수 후 reviewed=true로 쓴다.
+office_hash는 `node scripts/workflow.mjs office-hash`(또는 post-template)가 준다. 소스 코드를 읽어 계산하지 않는다. 모든 이미지 실물 검수 후 reviewed=true로 쓴다.
 
 `prepare --run <run> --file <post.json> --blog <ID> [--profile <profile.yaml>]`.
 확정되지 않았거나 근거 참조·수치·이미지·배너 프로필이 맞지 않으면 실패한다.
