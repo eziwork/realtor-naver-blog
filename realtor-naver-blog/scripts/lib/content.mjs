@@ -54,7 +54,7 @@ export function renderPost(post, listing, strategy, office, runDir) {
   requireThat(['stored','analyzed','default'].includes(post.style?.origin) && nonempty(post.style.summary), 'applied style provenance required');
   const title = checkText(post.title, listing, office);
   const md = [`# ${title}`, ''];
-  const html = [], texts = [], images = [], maps = [], tables = [];
+  const html = [], texts = [], images = [], maps = [], tables = [], headings = [];
   requireThat(Array.isArray(post.blocks) && post.blocks.length > 0, 'post blocks required');
   let ctaCount = 0, contactLink = null;
   for (const block of post.blocks) {
@@ -62,6 +62,7 @@ export function renderPost(post, listing, strategy, office, runDir) {
       const text = checkText(block, listing, office);
       if (block.section_id) requireThat(strategy.sections.some(s => s.id === block.section_id), 'unknown strategy section');
       texts.push(text);
+      if (block.type === 'heading') headings.push(text);
       md.push((block.type === 'heading' ? '## ' : '') + text, '');
       html.push(centered(inline(text), block.type === 'heading' ? 'heading' : 'body'));
     } else if (block.type === 'image') {
@@ -127,6 +128,6 @@ export function renderPost(post, listing, strategy, office, runDir) {
   }
   return {
     markdown: md.join('\n'), html: html.join('\n'),
-    manifest: {title, text_blocks: texts, tables, images, maps, contact: contactLink, telephone: strategy.cta.channel === 'phone' ? telephone(office.public_contact) : null, office_hash: officeFingerprint(office), map_omission_reason: post.map_omission_reason ?? null}
+    manifest: {title, text_blocks: texts, headings, tables, images, maps, contact: contactLink, telephone: strategy.cta.channel === 'phone' ? telephone(office.public_contact) : null, office_hash: officeFingerprint(office), map_omission_reason: post.map_omission_reason ?? null}
   };
 }

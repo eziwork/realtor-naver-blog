@@ -5,6 +5,7 @@ import os from 'node:os';
 import {readJSON, writeJSON, hash, nonempty, requireThat, validateListing, validateStrategy, validateStyle, blogKey} from './contracts.mjs';
 import {renderPost, officeFingerprint} from './content.mjs';
 import {saveContext, listKnowledge, validateAdviceRefs} from './broker-knowledge.mjs';
+import {compareObservation} from './verify.mjs';
 
 export class Workflow {
   constructor(runDir, {profileDir = path.join(os.homedir(), '.codex/naver-realtor-blog')} = {}) {
@@ -147,6 +148,22 @@ export class Workflow {
     requireThat(!(last.result?.status === 'SAVED' && !evidence.matched_identity), 'saved draft must be reopened, not recreated');
     state.reconciliation = {...evidence, attempt_id: last.id, checked_at: new Date().toISOString()};
     return this.save(state);
+  }
+  // 재열람 관측 파일(브라우저 셀이 직접 씀)을 manifest와 비교해 checks를 만들고 record까지 한다.
+  verify(observation) {
+    const state = this.state(), last = state.attempts.at(-1);
+    requireThat(last, 'begin first');
+    const checks = compareObservation(this.read('manifest.json'), observation);
+    const evidence = {
+      attempt_id: last.id, outcome: observation.saved ? 'saved' : 'unknown',
+      observation: observation.note || '저장 후 새 탭에서 임시저장 목록의 같은 글을 다시 열어 자동 비교',
+      save_signal: observation.save_signal, saved_identity: observation.saved_identity,
+      reopened_identity: observation.reopened_identity, checks
+    };
+    const result = this.record(evidence);
+    const failed = Object.entries(checks).filter(([, c]) => c.result === 'fail').map(([k, c]) => `${k}: ${c.evidence}`);
+    const unknown = Object.entries(checks).filter(([, c]) => c.result === 'unknown').map(([k, c]) => `${k}: ${c.evidence}`);
+    return {...result, checks, failed, unknown};
   }
   record(evidence) {
     const state = this.state(), last = state.attempts.at(-1);

@@ -78,11 +78,87 @@ nodeRepl.write(JSON.stringify({results, check}));
 
 ## 저장·재열람
 
-1. title/모든 문단/이미지/표/지도/연락처/남은 마커를 로컬 원고와 비교한다. 누락된 부분을 원고에서 수정하면 prepare부터 다시 검증한다.
-2. 저장 버튼만 사용한다. 현재 명칭은 '저장'이다. 저장 전후 목록 개수·저장 시각·토스트를 기록한다. '자동저장' 표시만으로 임시저장 목록에 들어갔다고 단정하지 않는다.
-3. 임시저장 목록에서 이번 글을 유일하게 식별한다. 같은 제목이 여러 개면 시각/가시적 ID로 구분하고 모호하면 저장 확인 불가로 보고한다.
-4. **현재 편집 중인 문서를 클릭하는 것은 재열람 검수가 아니다.** 새 작업 탭의 글쓰기 → 임시저장 목록 → 식별한 같은 글을 열어 확인한다. 새 탭에서 빈 글을 입력하거나 저장하지 않는다.
-5. 원고 제목·본문 모든 문단·표 각 셀·사진 로드/순서·지도 이름/주소·연락처 텍스트/링크를 비교한다. 가운데 정렬과 문장 사이 빈 줄 한 줄도 재검수하고 body 검사 근거에 기록한다. 지도 썸네일을 매물 사진 수에 합산하지 않는다.
-6. 관측과 스크린샷을 남기고 workflow.mjs record 실행. 검수된 탭을 결과로 남긴다. 공개 발행하지 않는다.
+**빠른 경로 (기본): 저장 셀 1개 → 중간 보고 → 검증 셀 1개 → `workflow.mjs verify`.** 비교는 코드가 한다. Codex가 재열람 화면을 여러 번 읽으며 눈으로 대조하지 않는다(v0.6.3 실행에서 이 왕복에 약 1분 10초). 검사 범위는 줄이지 않는다 — 제목, 모든 문장, 자리 표시 잔존, 굵게·크기 번짐, 사진 수·로드, 표 셀·테두리, 지도, 전화 줄·tel 링크·배너 링크.
+
+저장 전에 남은 `@@IMG/MAP@@`와 열린 패널이 없는지 확인한다(위 '사진·지도 자리 교체'). 저장 버튼만 사용한다(현재 명칭 '저장'). '자동저장' 표시만으로 저장됐다고 단정하지 않는다.
+
+**셀 A — 저장 + 저장 신호(임시저장 개수 전후)**
+
+```js
+// editorTab: 글을 입력한 작업 탭
+const scopeOf = async (tab) => (await tab.playwright.locator('iframe[name="mainFrame"]').count()) ? tab.playwright.frameLocator('iframe[name="mainFrame"]') : tab.playwright;
+const editor = await scopeOf(editorTab);
+const draftCount = async (scope) => {
+  const label = await scope.getByRole('button', {name: /임시저장된 글 보기/}).first().evaluate(el => el.getAttribute('aria-label') || el.innerText).catch(() => '');
+  const m = String(label).match(/(\d+)\s*개/) || String(label).match(/(\d+)/);
+  return m ? Number(m[1]) : null;
+};
+const before = await draftCount(editor);
+await editor.getByRole('button', {name: '저장', exact: true}).click();
+await new Promise(r => setTimeout(r, 2500));
+const after = await draftCount(editor);
+var saveSignal = {before, after, saved: before !== null && after !== null && after > before};
+nodeRepl.write(JSON.stringify(saveSignal));
+```
+
+**중간 보고 (셀 A 직후, 바로 보낸다):** `saved:true`면 사용자에게 한 번 알린다 — "임시저장했어요(목록 {before}→{after}개). 지금 저장된 글을 다시 열어 검증하고 있어요. 원고는 먼저 확인하셔도 돼요." 이 시점에는 **'완료'·'SAVED'라고 말하지 않는다.** `saved:false`면 중간 보고 없이 열린 패널·확인창부터 확인하고 한 번 다시 저장한다.
+
+**셀 B — 새 탭에서 같은 글 다시 열기 + 관측 파일 직접 쓰기**
+
+```js
+const run = "<run 폴더 절대경로>", blogId = "<blog_id>";
+const fsp = await import('node:fs/promises');
+const manifest = JSON.parse(await fsp.readFile(`${run}/manifest.json`, 'utf8'));
+var verifyTab = await cua.createBrowserTab('iab', `https://blog.naver.com/PostWriteForm.naver?blogId=${blogId}`, {visible: false});
+await new Promise(r => setTimeout(r, 2500));
+const vs = (await verifyTab.playwright.locator('iframe[name="mainFrame"]').count()) ? verifyTab.playwright.frameLocator('iframe[name="mainFrame"]') : verifyTab.playwright;
+await vs.getByRole('button', {name: '취소', exact: true}).click({timeoutMs: 1500}).catch(() => {}); // 자동복구 안내: 취소(삭제 아님)
+await vs.getByRole('button', {name: /임시저장된 글 보기/}).first().click();
+await new Promise(r => setTimeout(r, 1200));
+const titleRe = new RegExp(manifest.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+const entry = vs.getByRole('button', {name: titleRe}).first();
+const entryLabel = await entry.evaluate(el => el.getAttribute('aria-label') || el.innerText).catch(() => '');
+const savedAt = (String(entryLabel).match(/\d{4}\.\d{2}\.\d{2}\s*\d{1,2}:\d{2}/) || [''])[0];
+await entry.click();
+await new Promise(r => setTimeout(r, 3000));
+const obs = await vs.locator('body').evaluate((body) => {
+  const txt = n => (n?.textContent || '').replace(/[\u200b\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+  const titleEl = body.querySelector('.se-documentTitle, [class*="documentTitle"], .se-title-text');
+  const inTitle = n => titleEl && titleEl.contains(n);
+  const paraEls = [...body.querySelectorAll('.se-text-paragraph')].filter(p => !inTitle(p));
+  const paragraphs = (paraEls.length ? paraEls : [...body.querySelectorAll('p')]).map(p => {
+    const s = p.querySelector('span') || p; const cs = getComputedStyle(s);
+    return {text: txt(p), bold: Number(cs.fontWeight) >= 700, size: parseFloat(cs.fontSize)};
+  }).filter(p => p.text);
+  const images = [...body.querySelectorAll('img')].filter(i => /blogfiles|postfiles/.test(i.currentSrc || i.src)).map(i => ({loaded: i.complete && i.naturalWidth > 0}));
+  const tables = [...body.querySelectorAll('table')].map(t => {
+    const c = t.rows[0]?.cells[0]; const cs = c ? getComputedStyle(c) : null;
+    return {rows: [...t.rows].map(r => [...r.cells].map(txt)), bordered: cs ? (cs.borderTopStyle !== 'none' && parseFloat(cs.borderTopWidth) > 0) : null};
+  });
+  const maps = [...body.querySelectorAll('[class*="placesMap"], [class*="se-map"]')].map(m => ({name: txt(m).slice(0, 80)})).filter(m => m.name);
+  const links = [...body.querySelectorAll('a[href], [data-href]')].map(a => ({href: a.getAttribute('data-href') || a.getAttribute('href')}));
+  const imageLinks = [...body.querySelectorAll('[class*="image"] [data-href], [class*="image"] a[href]')].map(a => a.getAttribute('data-href') || a.getAttribute('href'));
+  return {title: titleEl ? txt(titleEl) : null, paragraphs, body_text: txt(body).slice(0, 20000), images, tables, maps, links, image_links: imageLinks.length ? imageLinks : null};
+});
+const observation = {
+  ...obs, saved: saveSignal.saved,
+  save_signal: `임시저장 목록 ${saveSignal.before}→${saveSignal.after}개, 목록에 ${savedAt} 저장 글`,
+  saved_identity: `${blogId} / ${manifest.title} / ${savedAt}`,
+  reopened_identity: `${blogId} / ${obs.title ?? manifest.title} / ${savedAt}`,
+  note: '저장 후 새 탭(글쓰기 직행)에서 임시저장 목록의 같은 제목·시각 글을 열어 관측'
+};
+await fsp.writeFile(`${run}/reopened-observation.json`, JSON.stringify(observation, null, 2));
+nodeRepl.write(JSON.stringify({savedAt, title: obs.title, paragraphs: obs.paragraphs.length, images: obs.images.length, tables: obs.tables.length}));
+```
+
+그다음 `node scripts/workflow.mjs verify --run <run> --file <run>/reopened-observation.json`. 코드가 manifest와 비교해 checks를 만들고 record까지 한다. 출력의 `failed`·`unknown`만 보면 된다.
+
+**최종 보고:** "검증이 끝났어요." + 저장 상태·완성도 + 실패/unknown 항목. `unknown`은 화면에서 해당 요소를 찾지 못했다는 뜻이다 — 통과로 바꾸지 않는다. 필요하면 그 항목만 화면을 직접 보고 확인한 뒤 `record`로 보완한다.
+
+규칙 (빠른 경로에도 그대로 적용):
+1. 같은 제목이 여러 개면 시각으로 구분하고, 모호하면 저장 확인 불가로 보고한다.
+2. **현재 편집 중인 문서를 보는 것은 재열람 검수가 아니다.** 반드시 새 탭에서 임시저장 목록을 통해 연다. 새 탭에서 빈 글을 입력하거나 저장하지 않는다.
+3. 지도 썸네일을 매물 사진 수에 합산하지 않는다(관측 이미지는 blogfiles/postfiles 업로드 이미지로만 센다).
+4. 검수된 탭을 결과로 남긴다. 공개 발행하지 않는다.
 
 실제 브라우저를 강제 로그아웃하거나 네트워크 차단해 실패를 만들지 않는다. 장애 대응은 상태 전이 테스트로 검증하고, 실제 장애가 발생하면 관측된 지점부터 기록한다. 내장 브라우저 접근 자체가 불가능해도 로컬 준비 결과는 전달한다.

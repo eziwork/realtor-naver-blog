@@ -36,9 +36,10 @@ for (let i = 0; i < argv.length; i += 2) {
     else if (command === 'prepare') result = flow.prepare(data(), office(), args.blog);
     else if (command === 'begin') result = flow.begin(office());
     else if (command === 'record') result = flow.record(data());
+    else if (command === 'verify') result = flow.verify(data());
     else if (command === 'reconcile') result = flow.reconcile(data());
     else if (command === 'status') result = flow.state();
-    else throw new Error('Commands: office-hash facts context-save knowledge-list knowledge-save knowledge-retire propose approve check-approved post-template prepare begin record reconcile status style-get style-save');
+    else throw new Error('Commands: office-hash facts context-save knowledge-list knowledge-save knowledge-retire propose approve check-approved post-template prepare begin verify record reconcile status style-get style-save');
   }
   process.stdout.write(JSON.stringify({ok:true, ...result}, null, 2) + '\n');
 } catch (error) {

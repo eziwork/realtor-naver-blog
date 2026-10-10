@@ -133,7 +133,9 @@ blog-post.md / transfer.html / manifest.json / post.json 경로와 해시를 sta
 `begin --run <run> [--profile <profile.yaml>]` → attempts 마지막 항목의 id.
 승인·원고·HTML·이미지·프로필 해시를 재검사한다. 시도가 시작되면 저장 실패/자동저장 가능성 때문에 무조건 새 글로 재시도하지 않는다.
 
-실제 브라우저 결과를 verification-input.json으로 저장:
+**기본은 `verify`다.** 셀 B가 쓴 `reopened-observation.json`(관측값 + `saved`·`save_signal`·`saved_identity`·`reopened_identity`)을 `verify --run <run> --file <reopened-observation.json>`에 넣으면 코드가 manifest와 비교해 아래 checks를 만들고 record까지 한다. 출력 `failed`·`unknown`에 문제 항목이 나온다. 관측하지 못한 항목은 unknown이며 통과가 아니다.
+
+직접 판정을 넣어야 할 때(예: unknown 항목을 화면으로 확인한 뒤)는 verification-input.json으로 저장:
 ```json
 {
   "attempt_id":"begin이 반환한 id",

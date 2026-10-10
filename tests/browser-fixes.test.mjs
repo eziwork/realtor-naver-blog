@@ -218,3 +218,56 @@ test('post-template keeps the condition table to key specs (max 12) and lists th
   assert.ok(rows.every(r => /관리비/.test(r.label)), 'key specs chosen by label');
   assert.ok(tpl.body_facts_todo.some(f => /주변 시설/.test(f.label)), 'others left for prose');
 });
+
+function transferring(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rnb-verify-'));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  fs.writeFileSync(path.join(dir, 'sample.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXgAAAABJRU5ErkJggg==', 'base64'));
+  const flow = new Workflow(dir);
+  const {listing, strategy, post} = fixture(factory);
+  flow.listing(listing); flow.propose(strategy);
+  flow.approve({listing_hash: hash(listing), strategy_hash: hash(flow.read('strategy.json')), user_quote: '테스트 시뮬레이션: 이 전략으로 진행'});
+  flow.prepare(post, office, 'fixture-blog');
+  flow.begin(office);
+  const m = flow.read('manifest.json');
+  const good = {
+    saved: true, save_signal: '임시저장 목록 1→2', saved_identity: 'fixture-blog / 제목 / 19:43', reopened_identity: 'fixture-blog / 제목 / 19:43',
+    title: m.title,
+    paragraphs: [...m.text_blocks.map(t => ({text: t, bold: m.headings.includes(t), size: m.headings.includes(t) ? 24 : 16})), {text: m.contact.label, bold: false, size: 16}],
+    images: m.images.map(() => ({loaded: true})),
+    tables: [{rows: m.tables[0], bordered: true}],
+    maps: [], links: [{href: m.contact.href}], image_links: [m.contact.href]
+  };
+  return {flow, m, good};
+}
+
+test('verify: a clean reopened draft is SAVED / 완료 without hand comparison', t => {
+  const {flow, good} = transferring(t);
+  const out = flow.verify(good);
+  assert.equal(out.result.status, 'SAVED');
+  assert.equal(out.result.quality, '완료');
+  assert.deepEqual(out.failed, []);
+  assert.match(out.checks.contact.evidence, /배너 이미지 링크도 일치/);
+});
+
+test('verify catches the measured failures: bold bleed, leftover placeholder, lost tel link', t => {
+  const {flow, m, good} = transferring(t);
+  const body = m.text_blocks.find(x => !m.headings.includes(x));
+  const bad = {...good,
+    paragraphs: [...good.paragraphs.map(p => p.text === body ? {...p, bold: true, size: 24} : p), {text: '@@IMG:2@@'}],
+    links: []};
+  const out = flow.verify(bad);
+  assert.equal(out.result.status, 'SAVED');
+  assert.equal(out.result.quality, '보완 필요');
+  assert.match(out.checks.body.evidence, /번진 본문/);
+  assert.match(out.checks.body.evidence, /@@IMG:2@@/);
+  assert.match(out.checks.contact.evidence, /tel 링크 없음/);
+});
+
+test('verify never passes what it could not observe', t => {
+  const {flow, good} = transferring(t);
+  const {paragraphs, images, links, ...partial} = good;
+  const out = flow.verify({...partial, body_text: ''});
+  assert.equal(out.result.quality, '확인 불가');
+  assert.ok(out.unknown.length >= 2);
+});
